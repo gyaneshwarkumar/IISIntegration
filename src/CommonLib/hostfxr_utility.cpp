@@ -396,7 +396,8 @@ HOSTFXR_UTILITY::FindDotnetExePath(
 
     // CreateProcess requires a mutable string to be passed to commandline
     // See https://blogs.msdn.microsoft.com/oldnewthing/20090601-00/?p=18083/
-    pwzDotnetName = SysAllocString(L"\"where.exe\" dotnet.exe");
+
+    pwzDotnetName = SysAllocString(L"\"where.exe\" dotnet.exee");
     if (pwzDotnetName == NULL)
     {
         hr = E_OUTOFMEMORY;
@@ -422,18 +423,29 @@ HOSTFXR_UTILITY::FindDotnetExePath(
 
     if (WaitForSingleObject(processInformation.hProcess, 2000) != WAIT_OBJECT_0) // 2 seconds
     {
-        TerminateProcess(processInformation.hProcess, 1);
+        TerminateProcess(processInformation.hProcess, 2);
         hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
         goto Finished;
     }
 
+    //
+    // where.exe will return 1 if the file is not found
+    // and 2 if there was an error. Check if the exit code is 1 and set
+    // a new hr result saying it couldn't find dotnet.exe
+    // 
     if (!GetExitCodeProcess(processInformation.hProcess, &dwExitCode) ||
         dwExitCode != 0)
     {
-        hr = HRESULT_FROM_WIN32(GetLastError());
+        if (dwExitCode == 1)
+        {
+            hr = HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
+        }
+        else
+        {
+            hr = HRESULT_FROM_WIN32(GetLastError());
+        }
         goto Finished;
     }
-
 
     // Reset file pointer to the beginning of the file. 
     dwFilePointer = SetFilePointer(hStdOutReadPipe, 0, NULL, FILE_BEGIN);
@@ -443,6 +455,10 @@ HOSTFXR_UTILITY::FindDotnetExePath(
         goto Finished;
     }
 
+    //
+    // As the call to where.exe succeeded (dotnet.exe was found), ReadFile should not hang.
+    // TODO consider putting ReadFile in a separate thread with a timeout to guarantee it doesn't block.
+    //
     if (!ReadFile(hStdOutReadPipe, pzFileContents, READ_BUFFER_SIZE, &dwNumBytesRead, NULL))
     {
         hr = HRESULT_FROM_WIN32(ERROR_FILE_INVALID);
