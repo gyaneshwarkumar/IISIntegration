@@ -38,7 +38,9 @@ private:
 
 
     static
-        HRESULT
-        FindDotnetExePath(ASPNETCORE_CONFIG* pConfig, STRU * struDotnetLocation);
+    HRESULT
+    FindDotnetExePath(
+        STRU * struDotnetLocation
+    );
 };
 

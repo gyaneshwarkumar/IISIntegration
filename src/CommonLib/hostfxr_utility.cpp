@@ -133,7 +133,7 @@ HOSTFXR_UTILITY::GetHostFxrParameters(
     }
     else
     {
-        if (FAILED(hr = HOSTFXR_UTILITY::FindDotnetExePath(pConfig, &struExeLocation))) {
+        if (FAILED(hr = HOSTFXR_UTILITY::FindDotnetExePath(&struExeLocation))) {
             goto Finished;
         }
 
@@ -349,8 +349,8 @@ Finished:
 
 HRESULT
 HOSTFXR_UTILITY::FindDotnetExePath(
-    _In_ ASPNETCORE_CONFIG* pConfig,
-    _Out_ STRU* struDotnetPath)
+    _Out_ STRU* struDotnetPath
+)
 {
     HRESULT             hr = S_OK;
     STARTUPINFOW        startupInfo = { 0 };
