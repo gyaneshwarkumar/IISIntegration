@@ -80,11 +80,18 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
 
             var context = server._iisContextFactory.CreateHttpContext(pInProcessHandler);
 
-            var task = Task.Run(() => context.ProcessRequestAsync());
-
-            task.ContinueWith((t, state) => CompleteRequest((IISHttpContext)state, t), context);
+            ThreadPool.QueueUserWorkItem(ExecuteRequest, context);
 
             return NativeMethods.REQUEST_NOTIFICATION_STATUS.RQ_NOTIFICATION_PENDING;
+        }
+
+        private static void ExecuteRequest(object iisHttpContext)
+        {
+            var context = (IISHttpContext)iisHttpContext;
+
+            var task = context.ProcessRequestAsync();
+
+            task.ContinueWith((t, state) => CompleteRequest((IISHttpContext)state, t), context);
         }
 
         private static bool HandleShutdown(IntPtr pvRequestContext)
