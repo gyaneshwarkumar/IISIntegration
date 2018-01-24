@@ -420,9 +420,11 @@ HOSTFXR_UTILITY::FindDotnetExePath(
         goto Finished;
     }
 
-    if (WaitForSingleObject(processInformation.hProcess, pConfig->QueryRequestTimeoutInMS()) != WAIT_OBJECT_0)
+    if (WaitForSingleObject(processInformation.hProcess, 2000) != WAIT_OBJECT_0) // 2 seconds
     {
         TerminateProcess(processInformation.hProcess, 1);
+        hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+        goto Finished;
     }
 
     if (!GetExitCodeProcess(processInformation.hProcess, &dwExitCode) ||
@@ -437,20 +439,20 @@ HOSTFXR_UTILITY::FindDotnetExePath(
     dwFilePointer = SetFilePointer(hStdOutReadPipe, 0, NULL, FILE_BEGIN);
     if (dwFilePointer == INVALID_SET_FILE_POINTER)
     {
-        hr = ERROR_FILE_INVALID;
+        hr = HRESULT_FROM_WIN32(ERROR_FILE_INVALID);
         goto Finished;
     }
 
     if (!ReadFile(hStdOutReadPipe, pzFileContents, READ_BUFFER_SIZE, &dwNumBytesRead, NULL))
     {
-        hr = ERROR_FILE_INVALID;
+        hr = HRESULT_FROM_WIN32(ERROR_FILE_INVALID);
         goto Finished;
     }
     if (dwNumBytesRead >= READ_BUFFER_SIZE)
     {
         // This shouldn't ever be this large. We could continue to call ReadFile in a loop,
         // however I'd rather error out here and report an issue.
-        hr = ERROR_FILE_TOO_LARGE;
+        hr = HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE);
         goto Finished;
     }
 
@@ -507,7 +509,7 @@ HOSTFXR_UTILITY::FindDotnetExePath(
 
     if (!fFound)
     {
-        hr = ERROR_FILE_NOT_FOUND;
+        hr = HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
         goto Finished;
     }
 
