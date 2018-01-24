@@ -370,8 +370,8 @@ HOSTFXR_UTILITY::FindDotnetExePath(
     BOOL                fIsCurrentProcess64Bit;
     BOOL                fFound = FALSE;
     CHAR                pzFileContents[READ_BUFFER_SIZE];
-    HANDLE              hStdOutReadPipe = NULL;
-    HANDLE              hStdOutWritePipe = NULL;
+    HANDLE              hStdOutReadPipe = INVALID_HANDLE_VALUE;
+    HANDLE              hStdOutWritePipe = INVALID_HANDLE_VALUE;
 
     securityAttributes.nLength = sizeof(securityAttributes);
     securityAttributes.lpSecurityDescriptor = NULL;
@@ -397,7 +397,7 @@ HOSTFXR_UTILITY::FindDotnetExePath(
     // CreateProcess requires a mutable string to be passed to commandline
     // See https://blogs.msdn.microsoft.com/oldnewthing/20090601-00/?p=18083/
 
-    pwzDotnetName = SysAllocString(L"\"where.exe\" dotnet.exee");
+    pwzDotnetName = SysAllocString(L"\"where.exe\" dotnet.exe");
     if (pwzDotnetName == NULL)
     {
         hr = E_OUTOFMEMORY;
@@ -531,11 +531,19 @@ HOSTFXR_UTILITY::FindDotnetExePath(
 
 Finished:
 
-    if (processInformation.hProcess != NULL)
+    if (hStdOutReadPipe != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(hStdOutReadPipe);
+    }
+    if (hStdOutWritePipe != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(hStdOutWritePipe);
+    }
+    if (processInformation.hProcess != INVALID_HANDLE_VALUE)
     {
         CloseHandle(processInformation.hProcess);
     }
-    if (processInformation.hThread != NULL)
+    if (processInformation.hThread != INVALID_HANDLE_VALUE)
     {
         CloseHandle(processInformation.hThread);
     }
