@@ -429,25 +429,28 @@ HOSTFXR_UTILITY::FindDotnetExePath(
     }
 
     //
-    // where.exe will return 1 if the file is not found
+    // where.exe will return 0 on success, 1 if the file is not found
     // and 2 if there was an error. Check if the exit code is 1 and set
     // a new hr result saying it couldn't find dotnet.exe
     // 
-    if (!GetExitCodeProcess(processInformation.hProcess, &dwExitCode) ||
-        dwExitCode == 2)
+    if (!GetExitCodeProcess(processInformation.hProcess, &dwExitCode))
     {
         hr = HRESULT_FROM_WIN32(GetLastError());
         goto Finished;
     }
 
+    //
+    // In this block, if anything fails, we will goto our fallback of
+    // looking in C:/Program Files/
+    // 
     if (dwExitCode == 0)
     {
+        // Where succeeded. 
         // Reset file pointer to the beginning of the file. 
         dwFilePointer = SetFilePointer(hStdOutReadPipe, 0, NULL, FILE_BEGIN);
         if (dwFilePointer == INVALID_SET_FILE_POINTER)
         {
-            hr = HRESULT_FROM_WIN32(ERROR_FILE_INVALID);
-            goto Finished;
+            goto Fallback;
         }
 
         //
@@ -456,15 +459,13 @@ HOSTFXR_UTILITY::FindDotnetExePath(
         //
         if (!ReadFile(hStdOutReadPipe, pzFileContents, READ_BUFFER_SIZE, &dwNumBytesRead, NULL))
         {
-            hr = HRESULT_FROM_WIN32(ERROR_FILE_INVALID);
-            goto Finished;
+            goto Fallback;
         }
         if (dwNumBytesRead >= READ_BUFFER_SIZE)
         {
             // This shouldn't ever be this large. We could continue to call ReadFile in a loop,
             // however I'd rather error out here and report an issue.
-            hr = HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE);
-            goto Finished;
+            goto Fallback;
         }
 
         if (FAILED(hr = struDotnetLocationsString.CopyA(pzFileContents, dwNumBytesRead)))
@@ -505,58 +506,52 @@ HOSTFXR_UTILITY::FindDotnetExePath(
             }
             prevIndex = index;
 
-            if (!GetBinaryTypeW(struDotnetSubstring.QueryStr(), &dwBinaryType))
-            {
-                // TODO should we ignore this failure and continue to trying the next dotnet.exe?
-                hr = HRESULT_FROM_WIN32(GetLastError());
-                goto Finished;
-            }
-            if (fIsCurrentProcess64Bit == (dwBinaryType == SCS_64BIT_BINARY)) {
+            if (GetBinaryTypeW(struDotnetSubstring.QueryStr(), &dwBinaryType) &&
+                fIsCurrentProcess64Bit == (dwBinaryType == SCS_64BIT_BINARY)) {
                 // Found a valid dotnet.
                 struDotnetPath->Copy(struDotnetSubstring);
                 fFound = TRUE;
             }
         }
     }
-    else
-    {
-        while (!fFound)
-        {
-            // Finally check
-            if (FAILED(struDotnetSubstring.Resize(dwPathSize)))
-            {
-                goto Finished;
-            }
-            dwNumBytesRead = GetEnvironmentVariable(L"ProgramFiles", struDotnetSubstring.QueryStr(), dwPathSize);
-            if (dwNumBytesRead == 0)
-            {
-                hr = HRESULT_FROM_WIN32(GetLastError());
-                goto Finished;
-            }
-            else if (dwNumBytesRead == dwPathSize)
-            {
-                dwPathSize *= 2 + 20; // for dotnet substring
 
-            }
-            else
+Fallback:
+
+    // Look in ProgramFiles
+    while (!fFound)
+    {
+        if (FAILED(struDotnetSubstring.Resize(dwPathSize)))
+        {
+            goto Finished;
+        }
+
+        // Program files will changes based on the 
+        dwNumBytesRead = GetEnvironmentVariable(L"ProgramFiles", struDotnetSubstring.QueryStr(), dwPathSize);
+        if (dwNumBytesRead == 0)
+        {
+            hr = HRESULT_FROM_WIN32(GetLastError());
+            goto Finished;
+        }
+        else if (dwNumBytesRead == dwPathSize)
+        {
+            dwPathSize *= 2 + 30; // for dotnet substring
+        }
+        else
+        {
+            if (FAILED(hr = struDotnetSubstring.SyncWithBuffer()) ||
+                FAILED(hr = struDotnetSubstring.Append(L"\\dotnet\\dotnet.exe")))
             {
-                if (FAILED(hr = struDotnetSubstring.SyncWithBuffer()) ||
-                    FAILED(hr = struDotnetSubstring.Append(L"\\dotnet\\dotnet.exe")))
-                {
-                    goto Finished;
-                }
-                if (!UTILITY::CheckIfFileExists(struDotnetSubstring.QueryStr()))
-                {
-                    hr = HRESULT_FROM_WIN32( GetLastError() );
-                    goto Finished;
-                }
-                struDotnetPath->Copy(struDotnetSubstring);
-                fFound = TRUE;
+                goto Finished;
             }
+            if (!UTILITY::CheckIfFileExists(struDotnetSubstring.QueryStr()))
+            {
+                hr = HRESULT_FROM_WIN32( GetLastError() );
+                goto Finished;
+            }
+            struDotnetPath->Copy(struDotnetSubstring);
+            fFound = TRUE;
         }
     }
-
-
 
 
 Finished:
