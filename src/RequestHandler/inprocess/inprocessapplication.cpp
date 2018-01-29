@@ -43,86 +43,89 @@ IN_PROCESS_APPLICATION::Recycle(
     VOID
 )
 {
-    if (m_fInitialized)
+
+    DWORD    dwThreadStatus = 0;
+    DWORD    dwTimeout = m_pConfig->QueryShutdownTimeLimitInMS();
+    HANDLE   handle = NULL;
+    WIN32_FIND_DATA fileData;
+
+    AcquireSRWLockExclusive(&m_srwLock);
+
+    if (!m_fInitialized)
     {
-        DWORD    dwThreadStatus = 0;
-        DWORD    dwTimeout = m_pConfig->QueryShutdownTimeLimitInMS();
-        HANDLE   handle = NULL;
-        WIN32_FIND_DATA fileData;
+        return;
+    }
 
-        AcquireSRWLockExclusive(&m_srwLock);
+    if (!m_pHttpServer->IsCommandLineLaunch() &&
+        !m_fRecycleProcessCalled &&
+        (m_pHttpServer->GetAdminManager() != NULL))
+    {
+        // IIS scenario.
+        // notify IIS first so that new request will be routed to new worker process
+        m_pHttpServer->RecycleProcess(L"AspNetCore Recycle Process on Demand");
+    }
 
-        if (!m_pHttpServer->IsCommandLineLaunch() &&
-            !m_fRecycleProcessCalled &&
-            (m_pHttpServer->GetAdminManager() != NULL))
+    m_fRecycleProcessCalled = TRUE;
+
+    // First call into the managed server and shutdown
+    if (m_ShutdownHandler != NULL)
+    {
+        m_ShutdownHandler(m_ShutdownHandlerContext);
+        m_ShutdownHandler = NULL;
+    }
+
+    if (m_hThread != NULL &&
+        GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 &&
+        dwThreadStatus == STILL_ACTIVE)
+    {
+        // wait for gracefullshut down, i.e., the exit of the background thread or timeout
+        if (WaitForSingleObject(m_hThread, dwTimeout) != WAIT_OBJECT_0)
         {
-            // IIS scenario.
-            // notify IIS first so that new request will be routed to new worker process
-            m_pHttpServer->RecycleProcess(L"AspNetCore Recycle Process on Demand");
-        }
-
-        m_fRecycleProcessCalled = TRUE;
-
-        // First call into the managed server and shutdown
-        if (m_ShutdownHandler != NULL)
-        {
-            m_ShutdownHandler(m_ShutdownHandlerContext);
-            m_ShutdownHandler = NULL;
-        }
-
-        if (m_hThread != NULL &&
-            GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 &&
-            dwThreadStatus == STILL_ACTIVE)
-        {
-            // wait for gracefullshut down, i.e., the exit of the background thread or timeout
-            if (WaitForSingleObject(m_hThread, dwTimeout) != WAIT_OBJECT_0)
+            // if the thread is still running, we need kill it first before exit to avoid AV
+            if (GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 && dwThreadStatus == STILL_ACTIVE)
             {
-                // if the thread is still running, we need kill it first before exit to avoid AV
-                if (GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 && dwThreadStatus == STILL_ACTIVE)
-                {
-                    TerminateThread(m_hThread, STATUS_CONTROL_C_EXIT);
-                }
+                TerminateThread(m_hThread, STATUS_CONTROL_C_EXIT);
             }
         }
+    }
 
-        CloseHandle(m_hThread);
-        m_hThread = NULL;
-        s_Application = NULL;
+    CloseHandle(m_hThread);
+    m_hThread = NULL;
+    s_Application = NULL;
 
-        ReleaseSRWLockExclusive(&m_srwLock);
+    ReleaseSRWLockExclusive(&m_srwLock);
 
-        if (m_pStdFile != NULL)
-        {
-            fflush(stdout);
-            fflush(stderr);
-            fclose(m_pStdFile);
-        }
+    if (m_pStdFile != NULL)
+    {
+        fflush(stdout);
+        fflush(stderr);
+        fclose(m_pStdFile);
+    }
 
-        if (m_hLogFileHandle != INVALID_HANDLE_VALUE)
-        {
-            m_Timer.CancelTimer();
-            CloseHandle(m_hLogFileHandle);
-            m_hLogFileHandle = INVALID_HANDLE_VALUE;
-        }
+    if (m_hLogFileHandle != INVALID_HANDLE_VALUE)
+    {
+        m_Timer.CancelTimer();
+        CloseHandle(m_hLogFileHandle);
+        m_hLogFileHandle = INVALID_HANDLE_VALUE;
+    }
 
-        // delete empty log file, if logging is not enabled
-        handle = FindFirstFile(m_struLogFilePath.QueryStr(), &fileData);
-        if (handle != INVALID_HANDLE_VALUE &&
-            fileData.nFileSizeHigh == 0 &&
-            fileData.nFileSizeLow == 0) // skip check of nFileSizeHigh
-        {
-            FindClose(handle);
-            // no need to check whether the deletion succeeds
-            // as nothing can be done
-            DeleteFile(m_struLogFilePath.QueryStr());
-        }
+    // delete empty log file, if logging is not enabled
+    handle = FindFirstFile(m_struLogFilePath.QueryStr(), &fileData);
+    if (handle != INVALID_HANDLE_VALUE &&
+        fileData.nFileSizeHigh == 0 &&
+        fileData.nFileSizeLow == 0) // skip check of nFileSizeHigh
+    {
+        FindClose(handle);
+        // no need to check whether the deletion succeeds
+        // as nothing can be done
+        DeleteFile(m_struLogFilePath.QueryStr());
+    }
 
-        if (m_pHttpServer && m_pHttpServer->IsCommandLineLaunch())
-        {
-            // IISExpress scenario
-            // Can only call exit to terminate current process
-            exit(0);
-        }
+    if (m_pHttpServer && m_pHttpServer->IsCommandLineLaunch())
+    {
+        // IISExpress scenario
+        // Can only call exit to terminate current process
+        exit(0);
     }
 }
 
@@ -133,21 +136,24 @@ IN_PROCESS_APPLICATION::OnAsyncCompletion(
     IN_PROCESS_HANDLER* pInProcessHandler
 )
 {
-
     REQUEST_NOTIFICATION_STATUS dwRequestNotificationStatus = RQ_NOTIFICATION_CONTINUE;
+
+    ReferenceApplication();
 
     if (pInProcessHandler->QueryIsManagedRequestComplete())
     {
         // means PostCompletion has been called and this is the associated callback.
         dwRequestNotificationStatus = pInProcessHandler->QueryAsyncCompletionStatus();
-        // TODO cleanup whatever disconnect listener there is
-        return dwRequestNotificationStatus;
     }
     else
     {
         // Call the managed handler for async completion.
-        return m_AsyncCompletionHandler(pInProcessHandler->QueryManagedHttpContext(), hrCompletionStatus, cbCompletion);
+        dwRequestNotificationStatus = m_AsyncCompletionHandler(pInProcessHandler->QueryManagedHttpContext(), hrCompletionStatus, cbCompletion);
     }
+
+    DereferenceApplication();
+
+    return dwRequestNotificationStatus;
 }
 
 REQUEST_NOTIFICATION_STATUS
@@ -156,27 +162,37 @@ IN_PROCESS_APPLICATION::OnExecuteRequest(
     _In_ IN_PROCESS_HANDLER* pInProcessHandler
 )
 {
+    REQUEST_NOTIFICATION_STATUS dwRequestNotificationStatus = RQ_NOTIFICATION_CONTINUE;
+
+    ReferenceApplication();
+
     if (m_RequestHandler != NULL)
     {
-        return m_RequestHandler(pInProcessHandler, m_RequestHandlerContext);
+        dwRequestNotificationStatus = m_RequestHandler(pInProcessHandler, m_RequestHandlerContext);
     }
-
-    //
-    // return error as the application did not register callback
-    //
-    if (ANCMEvents::ANCM_EXECUTE_REQUEST_FAIL::IsEnabled(pHttpContext->GetTraceContext()))
+    else
     {
-        ANCMEvents::ANCM_EXECUTE_REQUEST_FAIL::RaiseEvent(pHttpContext->GetTraceContext(),
-            NULL,
+        //
+        // return error as the application did not register callback
+        //
+        if (ANCMEvents::ANCM_EXECUTE_REQUEST_FAIL::IsEnabled(pHttpContext->GetTraceContext()))
+        {
+            ANCMEvents::ANCM_EXECUTE_REQUEST_FAIL::RaiseEvent(pHttpContext->GetTraceContext(),
+                NULL,
+                (ULONG)E_APPLICATION_ACTIVATION_EXEC_FAILURE);
+        }
+
+        pHttpContext->GetResponse()->SetStatus(500, 
+            "Internal Server Error", 
+            0,
             (ULONG)E_APPLICATION_ACTIVATION_EXEC_FAILURE);
+
+        dwRequestNotificationStatus = RQ_NOTIFICATION_FINISH_REQUEST;
     }
 
-    pHttpContext->GetResponse()->SetStatus(500, 
-                                    "Internal Server Error", 
-                                     0,
-                                     (ULONG)E_APPLICATION_ACTIVATION_EXEC_FAILURE);
+    DereferenceApplication();
 
-    return RQ_NOTIFICATION_FINISH_REQUEST;
+    return dwRequestNotificationStatus;
 }
 
 VOID
@@ -370,6 +386,8 @@ IN_PROCESS_APPLICATION::LoadManagedApplication
     DWORD      dwResult;
     BOOL       fLocked = FALSE;
 
+    ReferenceApplication();
+
     if (m_fManagedAppLoaded || m_fLoadManagedAppError)
     {
         // Core CLR has already been loaded.
@@ -486,6 +504,8 @@ Finished:
     {
         ReleaseSRWLockExclusive(&m_srwLock);
     }
+
+    DereferenceApplication();
 
     return hr;
 }
