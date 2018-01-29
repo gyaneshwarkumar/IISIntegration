@@ -136,7 +136,6 @@ HOSTFXR_UTILITY::GetHostFxrParameters(
         if (FAILED(hr = HOSTFXR_UTILITY::FindDotnetExePath(&struExeLocation))) {
             goto Finished;
         }
-
     }
 
     if (FAILED(hr = struExeLocation.SyncWithBuffer()) ||
@@ -363,6 +362,7 @@ HOSTFXR_UTILITY::FindDotnetExePath(
     DWORD               dwNumBytesRead;
     DWORD               dwFilePointer;
     DWORD               dwBinaryType;
+    DWORD               dwPathSize = MAX_PATH;
     INT                 index = 0;
     INT                 prevIndex = 0;
     BOOL                fResult = FALSE;
@@ -434,100 +434,130 @@ HOSTFXR_UTILITY::FindDotnetExePath(
     // a new hr result saying it couldn't find dotnet.exe
     // 
     if (!GetExitCodeProcess(processInformation.hProcess, &dwExitCode) ||
-        dwExitCode != 0)
+        dwExitCode == 2)
     {
-        if (dwExitCode == 1)
-        {
-            hr = HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
-        }
-        else
-        {
-            hr = HRESULT_FROM_WIN32(GetLastError());
-        }
-        goto Finished;
-    }
-
-    // Reset file pointer to the beginning of the file. 
-    dwFilePointer = SetFilePointer(hStdOutReadPipe, 0, NULL, FILE_BEGIN);
-    if (dwFilePointer == INVALID_SET_FILE_POINTER)
-    {
-        hr = HRESULT_FROM_WIN32(ERROR_FILE_INVALID);
-        goto Finished;
-    }
-
-    //
-    // As the call to where.exe succeeded (dotnet.exe was found), ReadFile should not hang.
-    // TODO consider putting ReadFile in a separate thread with a timeout to guarantee it doesn't block.
-    //
-    if (!ReadFile(hStdOutReadPipe, pzFileContents, READ_BUFFER_SIZE, &dwNumBytesRead, NULL))
-    {
-        hr = HRESULT_FROM_WIN32(ERROR_FILE_INVALID);
-        goto Finished;
-    }
-    if (dwNumBytesRead >= READ_BUFFER_SIZE)
-    {
-        // This shouldn't ever be this large. We could continue to call ReadFile in a loop,
-        // however I'd rather error out here and report an issue.
-        hr = HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE);
-        goto Finished;
-    }
-
-    if (FAILED(hr = struDotnetLocationsString.CopyA(pzFileContents, dwNumBytesRead)))
-    {
-        goto Finished;
-    }
-
-    // Check the bitness of the currently running process
-    // matches the dotnet.exe found. 
-    if (!IsWow64Process(GetCurrentProcess(), &fIsWow64Process))
-    {
-        // Calling IsWow64Process failed
         hr = HRESULT_FROM_WIN32(GetLastError());
         goto Finished;
     }
-    if (fIsWow64Process)
-    {
-        // 32 bit mode
-        fIsCurrentProcess64Bit = FALSE;
-    }
-    else
-    {
-        SYSTEM_INFO systemInfo;
-        GetNativeSystemInfo(&systemInfo);
-        fIsCurrentProcess64Bit = systemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64;
-    }
 
-    while (!fFound)
+    if (dwExitCode == 0)
     {
-        index = struDotnetLocationsString.IndexOf(L"\r\n", prevIndex);
-        if (index == -1)
+        // Reset file pointer to the beginning of the file. 
+        dwFilePointer = SetFilePointer(hStdOutReadPipe, 0, NULL, FILE_BEGIN);
+        if (dwFilePointer == INVALID_SET_FILE_POINTER)
         {
-            break;
+            hr = HRESULT_FROM_WIN32(ERROR_FILE_INVALID);
+            goto Finished;
         }
-        if (FAILED(hr = struDotnetSubstring.Copy(struDotnetLocationsString.QueryStr(), index - prevIndex)))
+
+        //
+        // As the call to where.exe succeeded (dotnet.exe was found), ReadFile should not hang.
+        // TODO consider putting ReadFile in a separate thread with a timeout to guarantee it doesn't block.
+        //
+        if (!ReadFile(hStdOutReadPipe, pzFileContents, READ_BUFFER_SIZE, &dwNumBytesRead, NULL))
+        {
+            hr = HRESULT_FROM_WIN32(ERROR_FILE_INVALID);
+            goto Finished;
+        }
+        if (dwNumBytesRead >= READ_BUFFER_SIZE)
+        {
+            // This shouldn't ever be this large. We could continue to call ReadFile in a loop,
+            // however I'd rather error out here and report an issue.
+            hr = HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE);
+            goto Finished;
+        }
+
+        if (FAILED(hr = struDotnetLocationsString.CopyA(pzFileContents, dwNumBytesRead)))
         {
             goto Finished;
         }
-        prevIndex = index;
 
-        if (!GetBinaryTypeW(struDotnetSubstring.QueryStr(), &dwBinaryType))
+        // Check the bitness of the currently running process
+        // matches the dotnet.exe found. 
+        if (!IsWow64Process(GetCurrentProcess(), &fIsWow64Process))
         {
-            // TODO should we ignore this failure and continue to trying the next dotnet.exe?
+            // Calling IsWow64Process failed
             hr = HRESULT_FROM_WIN32(GetLastError());
             goto Finished;
         }
-        if (fIsCurrentProcess64Bit == (dwBinaryType == SCS_64BIT_BINARY)) {
-            // Found a valid dotnet.
-            struDotnetPath->Copy(struDotnetSubstring);
-            fFound = TRUE;
+        if (fIsWow64Process)
+        {
+            // 32 bit mode
+            fIsCurrentProcess64Bit = FALSE;
+        }
+        else
+        {
+            SYSTEM_INFO systemInfo;
+            GetNativeSystemInfo(&systemInfo);
+            fIsCurrentProcess64Bit = systemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64;
+        }
+
+        while (!fFound)
+        {
+            index = struDotnetLocationsString.IndexOf(L"\r\n", prevIndex);
+            if (index == -1)
+            {
+                break;
+            }
+            if (FAILED(hr = struDotnetSubstring.Copy(struDotnetLocationsString.QueryStr(), index - prevIndex)))
+            {
+                goto Finished;
+            }
+            prevIndex = index;
+
+            if (!GetBinaryTypeW(struDotnetSubstring.QueryStr(), &dwBinaryType))
+            {
+                // TODO should we ignore this failure and continue to trying the next dotnet.exe?
+                hr = HRESULT_FROM_WIN32(GetLastError());
+                goto Finished;
+            }
+            if (fIsCurrentProcess64Bit == (dwBinaryType == SCS_64BIT_BINARY)) {
+                // Found a valid dotnet.
+                struDotnetPath->Copy(struDotnetSubstring);
+                fFound = TRUE;
+            }
+        }
+    }
+    else
+    {
+        while (!fFound)
+        {
+            // Finally check
+            if (FAILED(struDotnetSubstring.Resize(dwPathSize)))
+            {
+                goto Finished;
+            }
+            dwNumBytesRead = GetEnvironmentVariable(L"ProgramFiles", struDotnetSubstring.QueryStr(), dwPathSize);
+            if (dwNumBytesRead == 0)
+            {
+                hr = HRESULT_FROM_WIN32(GetLastError());
+                goto Finished;
+            }
+            else if (dwNumBytesRead == dwPathSize)
+            {
+                dwPathSize *= 2 + 20; // for dotnet substring
+
+            }
+            else
+            {
+                if (FAILED(hr = struDotnetSubstring.SyncWithBuffer()) ||
+                    FAILED(hr = struDotnetSubstring.Append(L"\\dotnet\\dotnet.exe")))
+                {
+                    goto Finished;
+                }
+                if (!UTILITY::CheckIfFileExists(struDotnetSubstring.QueryStr()))
+                {
+                    hr = HRESULT_FROM_WIN32( GetLastError() );
+                    goto Finished;
+                }
+                struDotnetPath->Copy(struDotnetSubstring);
+                fFound = TRUE;
+            }
         }
     }
 
-    if (!fFound)
-    {
-        hr = HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
-        goto Finished;
-    }
+
+
 
 Finished:
 
