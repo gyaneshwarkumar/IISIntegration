@@ -7,15 +7,15 @@ IN_PROCESS_APPLICATION::IN_PROCESS_APPLICATION(
     ASPNETCORE_CONFIG*  pConfig) :
     APPLICATION(pHttpServer, pConfig),
     m_ProcessExitCode(0),
-    m_fManagedAppLoaded(FALSE),
-    m_fLoadManagedAppError(FALSE),
-    m_fInitialized(FALSE),
-    m_fRecycleProcessCalled(FALSE),
     m_hLogFileHandle(INVALID_HANDLE_VALUE),
     m_hErrReadPipe(INVALID_HANDLE_VALUE),
     m_hErrWritePipe(INVALID_HANDLE_VALUE),
-    m_fDoneStdRedirect(FALSE),
     m_dwStdErrReadTotal(0)
+    m_fDoneStdRedirect(FALSE),
+    m_fBlockCallbacksIntoManaged(FALSE),
+    m_pInitialized(FALSE),
+    m_fShutdownCalledFromNative(FALSE),
+    m_fShutdownCalledFromManaged(FALSE)
 {
     // is it guaranteed that we have already checked app offline at this point?
     // If so, I don't think there is much to do here.
@@ -24,8 +24,7 @@ IN_PROCESS_APPLICATION::IN_PROCESS_APPLICATION(
     InitializeSRWLock(&m_srwLock);
 
     // TODO we can probably initialized as I believe we are the only ones calling recycle.
-    m_fInitialized = TRUE;
-    m_status = APPLICATION_STATUS::RUNNING;
+    m_status = APPLICATION_STATUS::STARTING;
 }
 
 IN_PROCESS_APPLICATION::~IN_PROCESS_APPLICATION()
@@ -33,101 +32,132 @@ IN_PROCESS_APPLICATION::~IN_PROCESS_APPLICATION()
     Recycle();
 }
 
+VOID
+IN_PROCESS_APPLICATION::Recycle()
+{
+    HANDLE   handle = NULL;
+    WIN32_FIND_DATA fileData;
+
+    if (!m_pHttpServer->IsCommandLineLaunch() &&
+        (m_pHttpServer->GetAdminManager() != NULL))
+    {
+        // IIS scenario.
+        // notify IIS first so that new request will be routed to new worker process
+        m_pHttpServer->RecycleProcess(L"AspNetCore Recycle Process on Demand");
+    }
+
+    s_Application = NULL;
+
+    if (m_pStdFile != NULL)
+    {
+        fflush(stdout);
+        fflush(stderr);
+        fclose(m_pStdFile);
+    }
+
+    if (m_hLogFileHandle != INVALID_HANDLE_VALUE)
+    {
+        m_Timer.CancelTimer();
+        CloseHandle(m_hLogFileHandle);
+        m_hLogFileHandle = INVALID_HANDLE_VALUE;
+    }
+
+    // delete empty log file, if logging is not enabled
+    handle = FindFirstFile(m_struLogFilePath.QueryStr(), &fileData);
+    if (handle != INVALID_HANDLE_VALUE &&
+        fileData.nFileSizeHigh == 0 &&
+        fileData.nFileSizeLow == 0) // skip check of nFileSizeHigh
+    {
+        FindClose(handle);
+        // no need to check whether the deletion succeeds
+        // as nothing can be done
+        DeleteFile(m_struLogFilePath.QueryStr());
+    }
+
+    CloseStdErrHandles();
+
+    if (m_pHttpServer && m_pHttpServer->IsCommandLineLaunch())
+    {
+        // IISExpress scenario
+        // Can only call exit to terminate current process
+        exit(0);
+    }
+}
+
 __override
 VOID
 IN_PROCESS_APPLICATION::ShutDown()
 {
-    //todo
-}
+    DWORD    dwTimeout;
+    DWORD    dwThreadStatus = 0;
+    BOOL     fLocked = FALSE;
 
-// This is the same function as before, TODO configrm if we need to change anything for configuration.
-VOID
-IN_PROCESS_APPLICATION::Recycle(
-    VOID
-)
-{
-    if (m_fInitialized)
+    if (IsDebuggerPresent())
     {
-        DWORD    dwThreadStatus = 0;
-        DWORD    dwTimeout = m_pConfig->QueryShutdownTimeLimitInMS();
-        HANDLE   handle = NULL;
-        WIN32_FIND_DATA fileData;
+        dwTimeout = INFINITE;
+    }
+    else
+    {
+        dwTimeout = m_pConfig->QueryShutdownTimeLimitInMS();
+    }
 
-        AcquireSRWLockExclusive(&m_srwLock);
+    if (m_fShutdownCalledFromNative ||
+        m_status == APPLICATION_STATUS::STARTING ||
+        m_status == APPLICATION_STATUS::FAIL
+        )
+    {
+        goto Finished;
+    }
+    AcquireSRWLockExclusive(&m_srwLock);
+    fLocked = TRUE;
+    if (m_fShutdownCalledFromNative ||
+        m_status == APPLICATION_STATUS::STARTING ||
+        m_status == APPLICATION_STATUS::FAIL
+        )
+    {
+        goto Finished;
+    }
 
-        if (!m_pHttpServer->IsCommandLineLaunch() &&
-            !m_fRecycleProcessCalled &&
-            (m_pHttpServer->GetAdminManager() != NULL))
+    // We need to keep track of when both managed and native initiate shutdown
+    // to avoid AVs. If shutdown has already been initiated in managed, we don't want to call into
+    // managed. We still need to wait on main exiting no matter what. m_fShutdownCalledFromNative
+    // is used for detecting redundant calls and blocking more requests to OnExecuteRequestHandler.
+    m_fShutdownCalledFromNative = TRUE;
+
+    if (!m_fShutdownCalledFromManaged)
+    {
+        m_ShutdownHandler(m_ShutdownHandlerContext);
+        m_ShutdownHandler = NULL;
+    }
+
+    ReleaseSRWLockExclusive(&m_srwLock);
+    fLocked = FALSE;
+
+    // Release the lock before we wait on the thread to exit. 
+    if (m_hThread != NULL &&
+        GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 &&
+        dwThreadStatus == STILL_ACTIVE)
+    {
+        // wait for graceful shutdown, i.e., the exit of the background thread or timeout
+        if (WaitForSingleObject(m_hThread, dwTimeout) != WAIT_OBJECT_0)
         {
-            // IIS scenario.
-            // notify IIS first so that new request will be routed to new worker process
-            m_pHttpServer->RecycleProcess(L"AspNetCore Recycle Process on Demand");
-        }
-
-        m_fRecycleProcessCalled = TRUE;
-
-        // First call into the managed server and shutdown
-        if (m_ShutdownHandler != NULL)
-        {
-            m_ShutdownHandler(m_ShutdownHandlerContext);
-            m_ShutdownHandler = NULL;
-        }
-
-        if (m_hThread != NULL &&
-            GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 &&
-            dwThreadStatus == STILL_ACTIVE)
-        {
-            // wait for gracefullshut down, i.e., the exit of the background thread or timeout
-            if (WaitForSingleObject(m_hThread, dwTimeout) != WAIT_OBJECT_0)
+            // if the thread is still running, we need kill it first before exit to avoid AV
+            if (GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 && dwThreadStatus == STILL_ACTIVE)
             {
-                // if the thread is still running, we need kill it first before exit to avoid AV
-                if (GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 && dwThreadStatus == STILL_ACTIVE)
-                {
-                    TerminateThread(m_hThread, STATUS_CONTROL_C_EXIT);
-                }
+                // Calling back into managed at this point is prone to have AVs
+                // Calling terminate thread here may be our best solution.
+                TerminateThread(m_hThread, STATUS_CONTROL_C_EXIT);
             }
         }
+    }
 
-        CloseHandle(m_hThread);
-        m_hThread = NULL;
-        s_Application = NULL;
+    CloseHandle(m_hThread);
+    m_hThread = NULL;
 
+Finished:
+    if (fLocked)
+    {
         ReleaseSRWLockExclusive(&m_srwLock);
-
-        CloseStdErrHandles();
-
-        if (m_pStdFile != NULL)
-        {
-            fflush(stdout);
-            fflush(stderr);
-            fclose(m_pStdFile);
-        }
-
-        if (m_hLogFileHandle != INVALID_HANDLE_VALUE)
-        {
-            m_Timer.CancelTimer();
-            CloseHandle(m_hLogFileHandle);
-            m_hLogFileHandle = INVALID_HANDLE_VALUE;
-        }
-
-        // delete empty log file
-        handle = FindFirstFile(m_struLogFilePath.QueryStr(), &fileData);
-        if (handle != INVALID_HANDLE_VALUE &&
-            fileData.nFileSizeHigh == 0 &&
-            fileData.nFileSizeLow == 0) // skip check of nFileSizeHigh
-        {
-            FindClose(handle);
-            // no need to check whether the deletion succeeds
-            // as nothing can be done
-            DeleteFile(m_struLogFilePath.QueryStr());
-        }
-
-        if (m_pHttpServer && m_pHttpServer->IsCommandLineLaunch())
-        {
-            // IISExpress scenario
-            // Can only call exit to terminate current process
-            exit(0);
-        }
     }
 }
 
@@ -140,18 +170,30 @@ IN_PROCESS_APPLICATION::OnAsyncCompletion(
 {
     REQUEST_NOTIFICATION_STATUS dwRequestNotificationStatus = RQ_NOTIFICATION_CONTINUE;
 
+    ReferenceApplication();
+
     if (pInProcessHandler->QueryIsManagedRequestComplete())
     {
         // means PostCompletion has been called and this is the associated callback.
         dwRequestNotificationStatus = pInProcessHandler->QueryAsyncCompletionStatus();
-        // TODO cleanup whatever disconnect listener there is
-        return dwRequestNotificationStatus;
+    }
+    else if (m_fBlockCallbacksIntoManaged)
+    {
+        pInProcessHandler->QueryHttpContext()->GetResponse()->SetStatus(503, 
+            "Server has been shutdown", 
+            0,
+            (ULONG)HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IN_PROGRESS));
+        dwRequestNotificationStatus = RQ_NOTIFICATION_FINISH_REQUEST;
     }
     else
     {
         // Call the managed handler for async completion.
-        return m_AsyncCompletionHandler(pInProcessHandler->QueryManagedHttpContext(), hrCompletionStatus, cbCompletion);
+        dwRequestNotificationStatus = m_AsyncCompletionHandler(pInProcessHandler->QueryManagedHttpContext(), hrCompletionStatus, cbCompletion);
     }
+
+    DereferenceApplication();
+
+    return dwRequestNotificationStatus;
 }
 
 REQUEST_NOTIFICATION_STATUS
@@ -160,27 +202,45 @@ IN_PROCESS_APPLICATION::OnExecuteRequest(
     _In_ IN_PROCESS_HANDLER* pInProcessHandler
 )
 {
-    if (m_RequestHandler != NULL)
+    REQUEST_NOTIFICATION_STATUS dwRequestNotificationStatus = RQ_NOTIFICATION_CONTINUE;
+    PFN_REQUEST_HANDLER pRequestHandler = NULL;
+    ReferenceApplication();
+    pRequestHandler = m_RequestHandler;
+    if (pRequestHandler == NULL)
     {
-        return m_RequestHandler(pInProcessHandler, m_RequestHandlerContext);
-    }
+        //
+        // return error as the application did not register callback
+        //
+        if (ANCMEvents::ANCM_EXECUTE_REQUEST_FAIL::IsEnabled(pHttpContext->GetTraceContext()))
+        {
+            ANCMEvents::ANCM_EXECUTE_REQUEST_FAIL::RaiseEvent(pHttpContext->GetTraceContext(),
+                NULL,
+                (ULONG)E_APPLICATION_ACTIVATION_EXEC_FAILURE);
+        }
 
-    //
-    // return error as the application did not register callback
-    //
-    if (ANCMEvents::ANCM_EXECUTE_REQUEST_FAIL::IsEnabled(pHttpContext->GetTraceContext()))
-    {
-        ANCMEvents::ANCM_EXECUTE_REQUEST_FAIL::RaiseEvent(pHttpContext->GetTraceContext(),
-            NULL,
+        pHttpContext->GetResponse()->SetStatus(500, 
+            "Internal Server Error", 
+            0,
             (ULONG)E_APPLICATION_ACTIVATION_EXEC_FAILURE);
+
+        dwRequestNotificationStatus = RQ_NOTIFICATION_FINISH_REQUEST;
+    }
+    else if (m_status != APPLICATION_STATUS::RUNNING || m_fBlockCallbacksIntoManaged)
+    {
+        pHttpContext->GetResponse()->SetStatus(503, 
+            "Server has been shutdown", 
+            0,
+            (ULONG)HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IN_PROGRESS));
+        dwRequestNotificationStatus = RQ_NOTIFICATION_FINISH_REQUEST;
+    }
+    else
+    {
+        dwRequestNotificationStatus = pRequestHandler(pInProcessHandler, m_RequestHandlerContext);
     }
 
-    pHttpContext->GetResponse()->SetStatus(500,
-        "Internal Server Error",
-        0,
-        (ULONG)E_APPLICATION_ACTIVATION_EXEC_FAILURE);
+    DereferenceApplication();
 
-    return RQ_NOTIFICATION_FINISH_REQUEST;
+    return dwRequestNotificationStatus;
 }
 
 VOID
@@ -203,7 +263,7 @@ IN_PROCESS_APPLICATION::SetCallbackHandles(
     SetStdHandle(STD_ERROR_HANDLE, INVALID_HANDLE_VALUE);
     // Initialization complete
     SetEvent(m_pInitalizeEvent);
-
+    m_pInitialized = TRUE;
 }
 
 VOID
@@ -478,13 +538,19 @@ IN_PROCESS_APPLICATION::LoadManagedApplication
     DWORD      dwResult;
     BOOL       fLocked = FALSE;
 
-    if (m_fManagedAppLoaded || m_fLoadManagedAppError)
+    ReferenceApplication();
+
+    if (m_status != APPLICATION_STATUS::STARTING)
     {
         // Core CLR has already been loaded.
         // Cannot load more than once even there was a failure
-        if (m_fLoadManagedAppError)
+        if (m_status == APPLICATION_STATUS::FAIL)
         {
             hr = E_APPLICATION_ACTIVATION_EXEC_FAILURE;
+        }
+        else if (m_status == APPLICATION_STATUS::SHUTDOWN)
+        {
+            hr = HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IS_SCHEDULED);
         }
 
         goto Finished;
@@ -495,11 +561,15 @@ IN_PROCESS_APPLICATION::LoadManagedApplication
 
     AcquireSRWLockExclusive(&m_srwLock);
     fLocked = TRUE;
-    if (m_fManagedAppLoaded || m_fLoadManagedAppError)
+    if (m_status != APPLICATION_STATUS::STARTING)
     {
-        if (m_fLoadManagedAppError)
+        if (m_status == APPLICATION_STATUS::FAIL )
         {
             hr = E_APPLICATION_ACTIVATION_EXEC_FAILURE;
+        }
+        else if (m_status == APPLICATION_STATUS::SHUTDOWN)
+        {
+            hr = HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IS_SCHEDULED);
         }
 
         goto Finished;
@@ -566,7 +636,7 @@ IN_PROCESS_APPLICATION::LoadManagedApplication
         goto Finished;
     }
 
-    m_fManagedAppLoaded = TRUE;
+    m_status = APPLICATION_STATUS::RUNNING;
 
 Finished:
 
@@ -575,7 +645,8 @@ Finished:
         STACK_STRU(strEventMsg, 256);
         // Question: in case of application loading failure, should we allow retry on 
         // following request or block the activation at all
-        m_fLoadManagedAppError = TRUE; // m_hThread != NULL ?
+        m_status = APPLICATION_STATUS::FAIL;
+
 
         if (SUCCEEDED(strEventMsg.SafeSnwprintf(
             ASPNETCORE_EVENT_LOAD_CLR_FALIURE_MSG,
@@ -595,6 +666,8 @@ Finished:
         ReleaseSRWLockExclusive(&m_srwLock);
     }
 
+    DereferenceApplication();
+
     return hr;
 }
 
@@ -612,7 +685,6 @@ IN_PROCESS_APPLICATION::ExecuteAspNetCoreProcess(
     // no need to log the error here as if error happened, the thread will exit
     // the error will ba catched by caller LoadManagedApplication which will log an error
     //
-
 }
 
 HRESULT
@@ -683,7 +755,15 @@ IN_PROCESS_APPLICATION::ExecuteApplication(
 
 Finished:
 
-    if (!m_fRecycleProcessCalled)
+    //
+    // this method is called by the background thread and should never exit unless shutdown
+    // If main returned and shutdown was not called in managed, we want to block native from calling into
+    // managed. To do this, we can say that shutdown was called from managed.
+    // Don't bother locking here as there will always be a race between receiving a native shutdown
+    // notification and unexpected managed exit.
+    //
+
+    if (!m_fShutdownCalledFromNative)
     {
         //
         // Ungraceful shutdown, try to log an error message.
@@ -776,8 +856,23 @@ Finished:
             }
         }
 
-        // The destructor of inprocessapplication will call recycle. No need to recycle here.
+        //Leave the app in an invalid state.
+        if (m_pInitialized)
+        {
+            //
+            // If the inprocess server was initialized, we need to cause recycle to be called on the worker process.
+            // We also want to remove the application from the application manager as by dereferencing it in the mananger
+            // will trigger recycle. We will post a notify configuration change here, allowing us to receive
+            // a global notification event, which would eventually cause the application to be dereferenced. This is only
+            // done if shutdown has not been called from native.
+            //
+            g_pHttpServer->NotifyConfigurationChange(m_pConfig->QueryConfigPath()->QueryStr());
+        }
     }
+
+    m_status = APPLICATION_STATUS::SHUTDOWN;
+    m_fShutdownCalledFromManaged = TRUE;
+    FreeLibrary(hModule);
 
     return hr;
 }

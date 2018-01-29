@@ -23,8 +23,7 @@ APPLICATION_INFO::~APPLICATION_INFO()
 
     if (m_pApplication != NULL)
     {
-        // shutdown the application
-        m_pApplication->ShutDown();
+        // Shutdown should have already been called if gracefully shutting down.
         m_pApplication->DereferenceApplication();
         m_pApplication = NULL;
     }
@@ -78,6 +77,20 @@ Finished:
     return hr;
 }
 
+VOID
+APPLICATION_INFO::ShutDown()
+{
+    if (m_pApplication != NULL)
+    {
+        AcquireSRWLockExclusive(&m_srwLock);
+        if (m_pApplication != NULL)
+        {
+            m_pApplication->ShutDown();
+        }
+        ReleaseSRWLockExclusive(&m_srwLock);
+    }
+}
+
 HRESULT
 APPLICATION_INFO::StartMonitoringAppOffline()
 {
@@ -98,6 +111,7 @@ APPLICATION_INFO::UpdateAppOfflineFileHandle()
         &strFilePath);
     APP_OFFLINE_HTM *pOldAppOfflineHtm = NULL;
     APP_OFFLINE_HTM *pNewAppOfflineHtm = NULL;
+    BOOL             fLocked = FALSE;
 
     if (INVALID_FILE_ATTRIBUTES == GetFileAttributes(strFilePath.QueryStr()) &&
         GetLastError() == ERROR_FILE_NOT_FOUND)
@@ -132,9 +146,17 @@ APPLICATION_INFO::UpdateAppOfflineFileHandle()
             }
         }
 
-        // recycle the application
+
         if (m_pApplication != NULL)
         {
+            // Lock here to avoid races with the application manager calling shutdown on the application.
+            AcquireSRWLockExclusive(&m_srwLock);
+            fLocked = TRUE;
+            if (m_pApplication == NULL)
+            {
+                goto Finished;
+            }
+
             STACK_STRU(strEventMsg, 256);
             if (SUCCEEDED(strEventMsg.SafeSnwprintf(
                 ASPNETCORE_EVENT_RECYCLE_APPOFFLINE_MSG,
@@ -149,8 +171,13 @@ APPLICATION_INFO::UpdateAppOfflineFileHandle()
             m_pApplication->ShutDown();
             m_pApplication->DereferenceApplication();
             m_pApplication = NULL;
-
         }
+    }
+
+Finished:
+    if (fLocked)
+    {
+        ReleaseSRWLockExclusive(&m_srwLock);
     }
 }
 
@@ -161,35 +188,10 @@ APPLICATION_INFO::EnsureApplicationCreated()
     BOOL                fLocked = FALSE;
     APPLICATION*        pApplication = NULL;
     STACK_STRU(struFileName, 300);  // >MAX_PATH
-    STRU                struHostFxrDllLocation;
-    PWSTR*              pwzArgv;
-    DWORD               dwArgCount;
 
     if (m_pApplication != NULL)
     {
         goto Finished;
-    }
-
-    if (m_pConfiguration->QueryHostingModel() == APP_HOSTING_MODEL::HOSTING_IN_PROCESS)
-    {
-        if (FAILED(hr = HOSTFXR_UTILITY::GetHostFxrParameters(
-            g_hEventLog,
-            m_pConfiguration->QueryProcessPath()->QueryStr(),
-            m_pConfiguration->QueryApplicationPhysicalPath()->QueryStr(),
-            m_pConfiguration->QueryArguments()->QueryStr(),
-            &struHostFxrDllLocation,
-            &dwArgCount,
-            &pwzArgv)))
-        {
-            goto Finished;
-        }
-
-        if (FAILED(hr = m_pConfiguration->SetHostFxrFullPath(struHostFxrDllLocation.QueryStr())))
-        {
-            goto Finished;
-        }
-
-        m_pConfiguration->SetHostFxrArguments(dwArgCount, pwzArgv);
     }
 
     hr = FindRequestHandlerAssembly();
@@ -370,7 +372,6 @@ Finished:
 // Calls into hostfxr.dll to find it.
 // Will leave hostfxr.dll loaded as it will be used again to call hostfxr_main.
 // 
-
 HRESULT
 APPLICATION_INFO::FindNativeAssemblyFromHostfxr(
     STRU* struFilename

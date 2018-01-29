@@ -68,6 +68,7 @@ public:
         _In_  IHttpServer             *pHttpServer,
         _In_  HTTP_MODULE_ID           pModuleId,
         _In_  IHttpContext            *pHttpContext,
+        _In_  HANDLE                   hEventLog,
         _Out_ ASPNETCORE_CONFIG       **ppAspNetCoreConfig
     );
 

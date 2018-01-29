@@ -64,12 +64,6 @@ public:
             delete m_pApplicationInfoHash;
             m_pApplicationInfoHash = NULL;
         }
-
-        if( m_pFileWatcher!= NULL )
-        {
-            delete m_pFileWatcher;
-            m_pFileWatcher = NULL;
-        }
     }
 
     FILE_WATCHER*

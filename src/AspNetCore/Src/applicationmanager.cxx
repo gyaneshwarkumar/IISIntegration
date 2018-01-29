@@ -124,10 +124,12 @@ APPLICATION_MANAGER::GetApplicationInfo(
         }
 
         *ppApplicationInfo = pApplicationInfo;
-        ReleaseSRWLockExclusive(&m_srwLock);
-        fExclusiveLock = FALSE;
 
+        // Listen to app offline before releasing the lock, which will avoid races here.
         pApplicationInfo->StartMonitoringAppOffline();
+        ReleaseSRWLockExclusive(&m_srwLock);
+
+        fExclusiveLock = FALSE;
         pApplicationInfo = NULL;
     }
 
@@ -171,6 +173,19 @@ Finished:
                     strEventMsg.QueryStr());
             }
         }
+        else if (m_fInShutdown)
+        {
+            if (SUCCEEDED(strEventMsg.SafeSnwprintf(
+                ASPNETCORE_EVENT_APP_IN_SHUTDOWN_MSG,
+                pszApplicationId,
+                pConfig->QueryHostingModel())))
+            {
+                UTILITY::LogEvent(g_hEventLog,
+                    EVENTLOG_ERROR_TYPE,
+                    ASPNETCORE_EVENT_APP_IN_SHUTDOWN,
+                    strEventMsg.QueryStr());
+            } 
+        }
         else
         {
             if (SUCCEEDED(strEventMsg.SafeSnwprintf(
@@ -197,16 +212,28 @@ APPLICATION_MANAGER::RecycleApplication(
     HRESULT          hr = S_OK;
     APPLICATION_INFO_KEY  key;
     DWORD            dwPreviousCounter = 0;
+    APPLICATION_INFO* pApplicationInfo;
 
     hr = key.Initialize(pszApplicationId);
     if (FAILED(hr))
     {
         goto Finished;
     }
+
     AcquireSRWLockExclusive(&m_srwLock);
     dwPreviousCounter = m_pApplicationInfoHash->Count();
 
-    m_pApplicationInfoHash->DeleteKey(&key);
+    m_pApplicationInfoHash->FindKey(&key, &pApplicationInfo); // FindKey will reference here.
+    ReleaseSRWLockExclusive(&m_srwLock);
+
+    if (pApplicationInfo != NULL)
+    {
+        pApplicationInfo->ShutDown();
+    }
+
+    AcquireSRWLockExclusive(&m_srwLock); // Blocked here.
+    m_pApplicationInfoHash->DereferenceRecord(pApplicationInfo);
+    ReleaseSRWLockExclusive(&m_srwLock);
 
     if(dwPreviousCounter != m_pApplicationInfoHash->Count())
     {
@@ -238,31 +265,31 @@ APPLICATION_MANAGER::RecycleApplication(
         g_pHttpServer->RecycleProcess(L"AspNetCore Recycle Process on Demand due to assembly loading failure");
     }
 
-    ReleaseSRWLockExclusive(&m_srwLock);
-
 Finished:
 
     return hr;
 }
 
+//
+// Calls shutdown on all APPLICATION_INFO objects in the manager.
+// 
 VOID
-APPLICATION_MANAGER::ShutDown()
+APPLICATION_MANAGER::ShutDown(
+    VOID
+)
 {
     m_fInShutdown = TRUE;
     if (m_pApplicationInfoHash != NULL)
     {
         AcquireSRWLockExclusive(&m_srwLock);
 
-        // clean up the hash table so that the application will be informed on shutdown
-        m_pApplicationInfoHash->Clear();
+        m_pApplicationInfoHash->Apply(APPLICATION_INFO::ShutDownWrapper, NULL);
 
         ReleaseSRWLockExclusive(&m_srwLock);
     }
-
-    // stop filewatcher monitoring thread
     if (m_pFileWatcher != NULL)
     {
-        delete  m_pFileWatcher;
+        delete m_pFileWatcher;
         m_pFileWatcher = NULL;
     }
 }

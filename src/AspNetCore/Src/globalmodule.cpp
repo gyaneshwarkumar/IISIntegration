@@ -19,7 +19,7 @@ ASPNET_CORE_GLOBAL_MODULE::OnGlobalStopListening(
 
     if (m_pApplicationManager != NULL)
     {
-        // we should let application manager to shudown all allication
+        // we should let application manager to shutdown all applications
         // and dereference it as some requests may still reference to application manager
         m_pApplicationManager->ShutDown();
         m_pApplicationManager = NULL;

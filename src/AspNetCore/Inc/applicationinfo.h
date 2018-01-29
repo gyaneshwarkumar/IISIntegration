@@ -143,6 +143,22 @@ public:
         return m_pfnAspNetCoreCreateRequestHandler;
     }
 
+    VOID
+    ShutDown(
+        VOID
+    );
+
+    static
+    VOID
+    ShutDownWrapper(
+        APPLICATION_INFO* pApplicationInfo,
+        PVOID context
+    )
+    {
+        UNREFERENCED_PARAMETER(context);
+        pApplicationInfo->ShutDown();
+    }
+
 private:
     HRESULT FindRequestHandlerAssembly();
     HRESULT FindNativeAssemblyFromGlobalLocation(STRU* struFilename);

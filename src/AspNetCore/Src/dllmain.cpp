@@ -47,7 +47,17 @@ BOOL WINAPI DllMain(HMODULE hModule,
         DisableThreadLibraryCalls(hModule);
         break;
     case DLL_PROCESS_DETACH:
-        StaticCleanup();
+        //
+        // DLL should free resources such as heap memory only if the DLL is being unloaded
+        // dynamically (the lpReserved parameter is NULL). Else, it is not safe for the DLL
+        // to clean up the resources. Instead, the DLL should allow the operating system to
+        // reclaim the memory.
+        //
+        if (lpReserved == NULL)
+        {
+            StaticCleanup();
+        }
+        break;
     default:
         break;
     }

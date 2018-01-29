@@ -158,6 +158,13 @@ Language=English
 %1
 .
 
+Messageid=1022
+SymbolicName=ASPNETCORE_EVENT_APP_IN_SHUTDOWN
+Language=English
+%1
+.
+
+
 ;
 ;#endif     // _ASPNETCORE_MODULE_MSG_H_
 ;

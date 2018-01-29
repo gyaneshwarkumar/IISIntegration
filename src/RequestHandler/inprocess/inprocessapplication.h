@@ -32,6 +32,7 @@ public:
             VOID
         );
 
+
     // Executes the .NET Core process
     HRESULT
         ExecuteApplication(
@@ -66,6 +67,25 @@ public:
             IHttpContext* pHttpContext,
             IN_PROCESS_HANDLER* pInProcessHandler
         );
+
+    VOID
+    StopCallsIntoManaged(
+        VOID
+    )
+    {
+        m_fBlockCallbacksIntoManaged = TRUE;
+    }
+
+    VOID
+    StopIncomingRequests(
+        VOID
+    )
+    {
+        m_fShutdownCalledFromManaged = TRUE;
+    }
+
+    VOID
+    Recycle();
 
     static
         IN_PROCESS_APPLICATION*
@@ -102,13 +122,12 @@ private:
     // The exit code of the .NET Core process
     INT                             m_ProcessExitCode;
 
-    BOOL                            m_fManagedAppLoaded;
-    BOOL                            m_fLoadManagedAppError;
-    BOOL                            m_fInitialized;
     BOOL                            m_fIsWebSocketsConnection;
     BOOL                            m_fDoneStdRedirect;
-    BOOL                            m_fRecycleProcessCalled;
-
+    volatile BOOL                   m_fBlockCallbacksIntoManaged;
+    volatile BOOL                   m_fShutdownCalledFromNative;
+    volatile BOOL                   m_fShutdownCalledFromManaged;
+    BOOL                            m_pInitialized;
     FILE*                           m_pStdFile;
     STTIMER                         m_Timer;
     SRWLOCK                         m_srwLock;

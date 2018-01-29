@@ -26,6 +26,20 @@ register_callbacks(
 }
 
 EXTERN_C __MIDL_DECLSPEC_DLLEXPORT
+VOID
+http_stop_calls_into_mananged()
+{
+    IN_PROCESS_APPLICATION::GetInstance()->StopCallsIntoManaged();
+}
+
+EXTERN_C __MIDL_DECLSPEC_DLLEXPORT
+VOID
+http_stop_incoming_requests()
+{
+    IN_PROCESS_APPLICATION::GetInstance()->StopIncomingRequests();
+}
+
+EXTERN_C __MIDL_DECLSPEC_DLLEXPORT
 HTTP_REQUEST*
 http_get_raw_request(
     _In_ IN_PROCESS_HANDLER* pInProcessHandler

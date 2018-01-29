@@ -46,12 +46,16 @@ ASPNETCORE_CONFIG::GetConfig(
     _In_  IHttpServer             *pHttpServer,
     _In_  HTTP_MODULE_ID           pModuleId,
     _In_  IHttpContext            *pHttpContext,
+    _In_  HANDLE                   hEventLog,
     _Out_ ASPNETCORE_CONFIG      **ppAspNetCoreConfig
 )
 {
     HRESULT                 hr = S_OK;
     IHttpApplication       *pHttpApplication = pHttpContext->GetApplication();
     ASPNETCORE_CONFIG      *pAspNetCoreConfig = NULL;
+    STRU                    struHostFxrDllLocation;
+    PWSTR*                  pwzArgv;
+    DWORD                   dwArgCount;
 
     if (ppAspNetCoreConfig == NULL)
     {
@@ -83,6 +87,28 @@ ASPNETCORE_CONFIG::GetConfig(
     if (FAILED(hr))
     {
         goto Finished;
+    }
+
+    if (pAspNetCoreConfig->QueryHostingModel() == APP_HOSTING_MODEL::HOSTING_IN_PROCESS)
+    {
+        if (FAILED(hr = HOSTFXR_UTILITY::GetHostFxrParameters(
+            hEventLog,
+            pAspNetCoreConfig->QueryProcessPath()->QueryStr(),
+            pAspNetCoreConfig->QueryApplicationPhysicalPath()->QueryStr(),
+            pAspNetCoreConfig->QueryArguments()->QueryStr(),
+            &struHostFxrDllLocation,
+            &dwArgCount,
+            &pwzArgv)))
+        {
+            goto Finished;
+        }
+
+        if (FAILED(hr = pAspNetCoreConfig->SetHostFxrFullPath(struHostFxrDllLocation.QueryStr())))
+        {
+            goto Finished;
+        }
+
+        pAspNetCoreConfig->SetHostFxrArguments(dwArgCount, pwzArgv);
     }
 
     hr = pHttpApplication->GetModuleContextContainer()->
