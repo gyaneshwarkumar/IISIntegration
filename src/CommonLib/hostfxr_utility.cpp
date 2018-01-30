@@ -435,8 +435,7 @@ HOSTFXR_UTILITY::FindDotnetExePath(
     // 
     if (!GetExitCodeProcess(processInformation.hProcess, &dwExitCode))
     {
-        hr = HRESULT_FROM_WIN32(GetLastError());
-        goto Finished;
+        goto Fallback;
     }
 
     //
@@ -509,7 +508,10 @@ HOSTFXR_UTILITY::FindDotnetExePath(
             if (GetBinaryTypeW(struDotnetSubstring.QueryStr(), &dwBinaryType) &&
                 fIsCurrentProcess64Bit == (dwBinaryType == SCS_64BIT_BINARY)) {
                 // Found a valid dotnet.
-                struDotnetPath->Copy(struDotnetSubstring);
+                if (FAILED(hr = struDotnetPath->Copy(struDotnetSubstring)))
+                {
+                    goto Finished;
+                }
                 fFound = TRUE;
             }
         }
@@ -520,7 +522,7 @@ Fallback:
     // Look in ProgramFiles
     while (!fFound)
     {
-        if (FAILED(struDotnetSubstring.Resize(dwPathSize)))
+        if (FAILED(hr = struDotnetSubstring.Resize(dwPathSize)))
         {
             goto Finished;
         }
@@ -548,7 +550,10 @@ Fallback:
                 hr = HRESULT_FROM_WIN32( GetLastError() );
                 goto Finished;
             }
-            struDotnetPath->Copy(struDotnetSubstring);
+            if (FAILED(hr = struDotnetPath->Copy(struDotnetSubstring)))
+            {
+                goto Finished;
+            }
             fFound = TRUE;
         }
     }
