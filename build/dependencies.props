@@ -3,7 +3,7 @@
     <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
   </PropertyGroup>
   <PropertyGroup Label="Package Versions">
-    <InternalAspNetCoreSdkPackageVersion>2.1.0-preview1-1010</InternalAspNetCoreSdkPackageVersion>
+    <InternalAspNetCoreSdkPackageVersion>2.1.0-preview1-1013</InternalAspNetCoreSdkPackageVersion>
     <MicrosoftAspNetCoreAllPackageVersion>2.1.0-preview1-28240</MicrosoftAspNetCoreAllPackageVersion>
     <MicrosoftAspNetCoreAuthenticationCorePackageVersion>2.1.0-preview1-28240</MicrosoftAspNetCoreAuthenticationCorePackageVersion>
     <MicrosoftAspNetCoreHostingAbstractionsPackageVersion>2.1.0-preview1-28240</MicrosoftAspNetCoreHostingAbstractionsPackageVersion>
@@ -12,6 +12,7 @@
     <MicrosoftAspNetCoreHttpOverridesPackageVersion>2.1.0-preview1-28240</MicrosoftAspNetCoreHttpOverridesPackageVersion>
     <MicrosoftAspNetCoreHttpPackageVersion>2.1.0-preview1-28240</MicrosoftAspNetCoreHttpPackageVersion>
     <MicrosoftAspNetCoreHttpSysSourcesPackageVersion>2.1.0-preview1-28240</MicrosoftAspNetCoreHttpSysSourcesPackageVersion>
+    <MicrosoftAspNetCoreServerIISPackageVersion>2.1.0-preview1-28240</MicrosoftAspNetCoreServerIISPackageVersion>
     <MicrosoftAspNetCoreServerIntegrationTestingPackageVersion>0.5.0-preview1-28240</MicrosoftAspNetCoreServerIntegrationTestingPackageVersion>
     <MicrosoftAspNetCoreServerKestrelPackageVersion>2.1.0-preview1-28240</MicrosoftAspNetCoreServerKestrelPackageVersion>
     <MicrosoftAspNetCoreTestHostPackageVersion>2.1.0-preview1-28240</MicrosoftAspNetCoreTestHostPackageVersion>
@@ -22,7 +23,6 @@
     <MicrosoftExtensionsLoggingAbstractionsPackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsLoggingAbstractionsPackageVersion>
     <MicrosoftExtensionsLoggingConsolePackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsLoggingConsolePackageVersion>
     <MicrosoftExtensionsLoggingDebugPackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsLoggingDebugPackageVersion>
-    <MicrosoftAspNetCoreServerIISPackageVersion>2.1.0-preview1-28240</MicrosoftAspNetCoreServerIISPackageVersion>
     <MicrosoftExtensionsLoggingPackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsLoggingPackageVersion>
     <MicrosoftExtensionsLoggingTestingPackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsLoggingTestingPackageVersion>
     <MicrosoftExtensionsOptionsPackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsOptionsPackageVersion>
