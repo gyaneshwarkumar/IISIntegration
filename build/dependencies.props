@@ -22,6 +22,7 @@
     <MicrosoftExtensionsLoggingAbstractionsPackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsLoggingAbstractionsPackageVersion>
     <MicrosoftExtensionsLoggingConsolePackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsLoggingConsolePackageVersion>
     <MicrosoftExtensionsLoggingDebugPackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsLoggingDebugPackageVersion>
+    <MicrosoftAspNetCoreServerIISPackageVersion>2.1.0-preview1-28240</MicrosoftAspNetCoreServerIISPackageVersion>
     <MicrosoftExtensionsLoggingPackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsLoggingPackageVersion>
     <MicrosoftExtensionsLoggingTestingPackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsLoggingTestingPackageVersion>
     <MicrosoftExtensionsOptionsPackageVersion>2.1.0-preview1-28240</MicrosoftExtensionsOptionsPackageVersion>
