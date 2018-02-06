@@ -6,6 +6,69 @@ ASPNET_CORE_GLOBAL_MODULE::ASPNET_CORE_GLOBAL_MODULE(
     m_pApplicationManager = pApplicationManager;
 }
 
+GLOBAL_NOTIFICATION_STATUS
+ASPNET_CORE_GLOBAL_MODULE::OnGlobalApplicationStart
+(
+    _In_ IHttpApplicationStartProvider * pProvider
+)
+{
+    HRESULT                         hr = S_OK;
+    IHttpApplication*               application = pProvider->GetApplication();
+    IAppHostAdminManager           *pAdminManager = NULL;
+    BSTR                            bstrAspNetCoreSection = NULL;
+    STRU                            struConfigPath;
+    STRU                            strHostingModel;
+    IAppHostElement                *pAspNetCoreElement = NULL;
+    APP_HOSTING_MODEL               hostingModel;
+
+    pAdminManager = g_pHttpServer->GetAdminManager();
+    hr = struConfigPath.Copy(application->GetAppConfigPath());
+
+    bstrAspNetCoreSection = SysAllocString(CS_ASPNETCORE_SECTION);
+
+    hr = pAdminManager->GetAdminSection(bstrAspNetCoreSection,
+        struConfigPath.QueryStr(),
+        &pAspNetCoreElement);
+    if (FAILED(hr))
+    {
+        goto Finished;
+    }
+
+
+    hr = GetElementStringProperty(pAspNetCoreElement,
+        CS_ASPNETCORE_HOSTING_MODEL,
+        &strHostingModel);
+    if (FAILED(hr))
+    {
+        // Swallow this error for backward compatability
+        // Use default behavior for empty string
+        hr = S_OK;
+    }
+
+    if (strHostingModel.IsEmpty() || strHostingModel.Equals(L"outofprocess", TRUE))
+    {
+        hostingModel = HOSTING_OUT_PROCESS;
+        wprintf(L"Out of proc");
+        UTILITY::LogEvent(g_hEventLog, 0, 0, L"Out of proc");
+    }
+    else if (strHostingModel.Equals(L"inprocess", TRUE))
+    {
+        hostingModel = HOSTING_IN_PROCESS;
+        wprintf(L"in proc");
+        UTILITY::LogEvent(g_hEventLog, 0, 0, L"in proc");
+    }
+    else
+    {
+        // block unknown hosting value
+        hr = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+        goto Finished;
+    }
+
+Finished:
+    UTILITY::LogEvent(g_hEventLog, 0, 0, L"Hello from global app start");
+
+    return GL_NOTIFICATION_CONTINUE;
+}
 //
 // Is called when IIS decided to terminate worker process
 // Shut down all core apps

@@ -12,6 +12,11 @@ public:
         APPLICATION_MANAGER* pApplicationManager
     );
 
+    GLOBAL_NOTIFICATION_STATUS
+    OnGlobalApplicationStart(
+        _In_ IHttpApplicationStartProvider * pProvider
+    );
+
     ~ASPNET_CORE_GLOBAL_MODULE()
     {
     }
