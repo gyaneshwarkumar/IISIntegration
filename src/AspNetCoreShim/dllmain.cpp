@@ -19,24 +19,11 @@ SRWLOCK             g_srwLock;
 DWORD               g_dwDebugFlags = 0;
 PCSTR               g_szDebugLabel = "ASPNET_CORE_MODULE";
 PCWSTR              g_pwzAspnetcoreRequestHandlerName = L"aspnetcorerh.dll";
-PFN_ASPNETCORE_CREATE_APPLICATION      g_pfnAspNetCoreCreateApplication;
-PFN_ASPNETCORE_CREATE_REQUEST_HANDLER  g_pfnAspNetCoreCreateRequestHandler;
-
-VOID
-StaticCleanup()
-{
-    APPLICATION_MANAGER::Cleanup();
-    if (g_hEventLog != NULL)
-    {
-        DeregisterEventSource(g_hEventLog);
-        g_hEventLog = NULL;
-    }
-}
 
 BOOL WINAPI DllMain(HMODULE hModule,
     DWORD  ul_reason_for_call,
     LPVOID lpReserved
-    )
+)
 {
     UNREFERENCED_PARAMETER(lpReserved);
 
@@ -47,7 +34,6 @@ BOOL WINAPI DllMain(HMODULE hModule,
         DisableThreadLibraryCalls(hModule);
         break;
     case DLL_PROCESS_DETACH:
-        StaticCleanup();
     default:
         break;
     }
@@ -83,20 +69,21 @@ HRESULT
 --*/
 {
     HRESULT                             hr = S_OK;
+    HKEY                                hKey;
     ASPNET_CORE_GLOBAL_MODULE *         pGlobalModule = NULL;
 
     UNREFERENCED_PARAMETER(dwServerVersion);
+
 #ifdef DEBUG
     CREATE_DEBUG_PRINT_OBJECT("Asp.Net Core Module");
     g_dwDebugFlags = DEBUG_FLAGS_ANY;
 #endif // DEBUG
 
     CREATE_DEBUG_PRINT_OBJECT;
-    g_pHttpServer = pHttpServer;
 
     pGlobalModule = NULL;
 
-    pGlobalModule = new ASPNET_CORE_GLOBAL_MODULE();
+    pGlobalModule = new ASPNET_CORE_GLOBAL_MODULE(pHttpServer);
     if (pGlobalModule == NULL)
     {
         hr = E_OUTOFMEMORY;
@@ -107,7 +94,7 @@ HRESULT
         pGlobalModule,
         GL_APPLICATION_STOP | // Configuration change trigers IIS application stop
         GL_STOP_LISTENING |
-        GL_APPLICATION_RESOLVE_MODULES);   // worker process stop or recycle
+        GL_APPLICATION_START);   // worker process stop or recycle
 
     if (FAILED(hr))
     {
@@ -125,3 +112,4 @@ Finished:
 
     return hr;
 }
+

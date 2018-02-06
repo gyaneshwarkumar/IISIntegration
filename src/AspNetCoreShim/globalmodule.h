@@ -9,12 +9,13 @@ class ASPNET_CORE_GLOBAL_MODULE : public CGlobalModule
 public:
 
     ASPNET_CORE_GLOBAL_MODULE(
+        IHttpServer* server
     );
 
     GLOBAL_NOTIFICATION_STATUS
-    OnGlobalApplicationResolveModules(
-        _In_ IHttpApplicationResolveModulesProvider  * pProvider
-    );
+        OnGlobalApplicationStart(
+            _In_ IHttpApplicationStartProvider * pProvider
+        );
 
     ~ASPNET_CORE_GLOBAL_MODULE()
     {
@@ -27,15 +28,14 @@ public:
     }
 
     GLOBAL_NOTIFICATION_STATUS
-    OnGlobalStopListening(
-        _In_ IGlobalStopListeningProvider * pProvider
-    );
+        OnGlobalStopListening(
+            _In_ IGlobalStopListeningProvider * pProvider
+        );
 
     GLOBAL_NOTIFICATION_STATUS
-    OnGlobalApplicationStop(
-        _In_ IHttpApplicationStopProvider * pProvider
-    );
-
-private:
-    APPLICATION_MANAGER * m_pApplicationManager;
+        OnGlobalApplicationStop(
+            _In_ IHttpApplicationStopProvider * pProvider
+        );
+protected:
+    IHttpServer* m_pHttpServer;
 };
