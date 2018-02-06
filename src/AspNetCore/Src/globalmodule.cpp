@@ -55,9 +55,8 @@ ASPNET_CORE_GLOBAL_MODULE::OnGlobalApplicationResolveModules
         wprintf(L"in proc");
         UTILITY::LogEvent(g_hEventLog, 0, 0, L"in proc");
         pProvider->RegisterModule(
-            0, new ASPNET_CORE_PROXY_MODULE_FACTORY, L"AspNetCore ProxyModule", L"", L"", RQ_EXECUTE_REQUEST_HANDLER, 0
+            0, new ASPNET_CORE_PROXY_MODULE_FACTORY, L"AspNetCoreModule", L"", L"", RQ_EXECUTE_REQUEST_HANDLER, 0
         );
-
     }
     else
     {

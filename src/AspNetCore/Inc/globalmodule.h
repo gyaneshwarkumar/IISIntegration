@@ -11,6 +11,7 @@ public:
     ASPNET_CORE_GLOBAL_MODULE(
     );
 
+    __override
     GLOBAL_NOTIFICATION_STATUS
     OnGlobalApplicationResolveModules(
         _In_ IHttpApplicationResolveModulesProvider  * pProvider
@@ -26,11 +27,13 @@ public:
         delete this;
     }
 
+    __override
     GLOBAL_NOTIFICATION_STATUS
     OnGlobalStopListening(
         _In_ IGlobalStopListeningProvider * pProvider
     );
 
+    __override
     GLOBAL_NOTIFICATION_STATUS
     OnGlobalApplicationStop(
         _In_ IHttpApplicationStopProvider * pProvider
