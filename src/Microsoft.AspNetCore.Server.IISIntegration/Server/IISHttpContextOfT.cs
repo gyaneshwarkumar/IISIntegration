@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.AspNetCore.Server.IISIntegration
 {
@@ -14,8 +15,8 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
     {
         private readonly IHttpApplication<TContext> _application;
 
-        public IISHttpContextOfT(MemoryPool memoryPool, IHttpApplication<TContext> application, IntPtr pInProcessHandler, IISOptions options)
-            : base(memoryPool, pInProcessHandler, options)
+        public IISHttpContextOfT(MemoryPool memoryPool, IHttpApplication<TContext> application, IntPtr pInProcessHandler, IISOptions options, ILogger logger)
+            : base(memoryPool, pInProcessHandler, options, logger)
         {
             _application = application;
         }
@@ -28,7 +29,6 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             try
             {
                 context = _application.CreateContext(this);
-
                 await _application.ProcessRequestAsync(context);
                 // TODO Verification of Response
                 //if (Volatile.Read(ref _requestAborted) == 0)
@@ -73,7 +73,7 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             }
             catch (Exception ex)
             {
-                // TODO Log this
+                LogHelper.LogException(_logger, "Exception thrown while disposing context.", ex);
                 _applicationException = _applicationException ?? ex;
                 success = false;
             }
@@ -82,17 +82,19 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
                 // The app is finished and there should be nobody writing to the response pipe
                 Output.Dispose();
 
-                if (_writingTask != null)
+                Input.Reader.Complete();
+                if (_readWebsocketTask != null)
                 {
-                    await _writingTask;
+                    await _readWebsocketTask;
                 }
 
-                // The app is finished and there should be nobody reading from the request pipe
-                Input.Reader.Complete();
-
-                if (_readingTask != null)
+                if (_writeWebsocketTask != null)
                 {
-                    await _readingTask;
+                    await _writeWebsocketTask;
+                }
+                if (_readWriteTask != null)
+                {
+                    await _readWriteTask;
                 }
             }
             return success;

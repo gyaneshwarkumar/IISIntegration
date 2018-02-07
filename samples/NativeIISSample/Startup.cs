@@ -69,6 +69,7 @@ namespace NativeIISSample
                 {
                     await context.Response.WriteAsync(varName + ": " + context.GetIISServerVariable(varName) + Environment.NewLine);
                 }
+
             });
         }
 

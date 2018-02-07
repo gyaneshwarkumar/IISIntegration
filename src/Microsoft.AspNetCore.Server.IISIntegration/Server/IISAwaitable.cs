@@ -18,7 +18,7 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
         private Action _callback;
 
         private Exception _exception;
-
+        private int _hr;
         private int _cbBytes;
 
         public static readonly NativeMethods.PFN_WEBSOCKET_ASYNC_COMPLETION ReadCallback = (IntPtr pHttpContext, IntPtr pCompletionInfo, IntPtr pvCompletionContext) =>
@@ -87,6 +87,7 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
         public void Complete(int hr, int cbBytes)
         {
             _exception = Marshal.GetExceptionForHR(hr);
+            _hr = hr;
             _cbBytes = cbBytes;
 
             var continuation = Interlocked.Exchange(ref _callback, _callbackCompleted);

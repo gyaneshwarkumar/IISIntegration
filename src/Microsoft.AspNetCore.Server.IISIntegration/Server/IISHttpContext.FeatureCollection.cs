@@ -137,8 +137,8 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
 
         string IHttpRequestFeature.RawTarget
         {
-            get => RawTarget;
-            set => RawTarget = value;
+            get => RawUrl;
+            set => RawUrl = value;
         }
 
         IHeaderDictionary IHttpRequestFeature.Headers
@@ -294,12 +294,11 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
 
             StatusCode = StatusCodes.Status101SwitchingProtocols;
             ReasonPhrase = ReasonPhrases.GetReasonPhrase(StatusCodes.Status101SwitchingProtocols);
-            await UpgradeAsync();
-            NativeMethods.http_enable_websockets(_pInProcessHandler);
-
-            _wasUpgraded = true;
             _readWebSocketsOperation = new IISAwaitable();
             _writeWebSocketsOperation = new IISAwaitable();
+            await UpgradeAsync();
+            NativeMethods.http_enable_websockets(_pInProcessHandler);
+            _wasUpgraded = true;
 
             return new DuplexStream(RequestBody, ResponseBody);
         }

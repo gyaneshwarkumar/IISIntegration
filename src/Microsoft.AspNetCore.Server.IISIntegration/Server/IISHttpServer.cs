@@ -12,53 +12,77 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Microsoft.AspNetCore.Server.IISIntegration
 {
     internal class IISHttpServer : IServer
     {
+        // Native structs/variables
         private static NativeMethods.PFN_REQUEST_HANDLER _requestHandler = HandleRequest;
         private static NativeMethods.PFN_SHUTDOWN_HANDLER _shutdownHandler = HandleShutdown;
         private static NativeMethods.PFN_ASYNC_COMPLETION _onAsyncCompletion = OnAsyncCompletion;
-
-        private IISContextFactory _iisContextFactory;
         private readonly MemoryPool _memoryPool = new MemoryPool();
         private GCHandle _httpServerHandle;
+
+        // Mananged structs/variables
+        private IISContextFactory _iisContextFactory;
         private readonly IApplicationLifetime _applicationLifetime;
         private readonly IAuthenticationSchemeProvider _authentication;
         private readonly IISOptions _options;
+        private readonly ILogger _logger;
 
         public IFeatureCollection Features { get; } = new FeatureCollection();
-        public IISHttpServer(IApplicationLifetime applicationLifetime, IAuthenticationSchemeProvider authentication, IOptions<IISOptions> options)
+        public IISHttpServer(IApplicationLifetime applicationLifetime, IAuthenticationSchemeProvider authentication, IOptions<IISOptions> options, ILoggerFactory loggerFactory)
         {
-            _applicationLifetime = applicationLifetime;
-            _authentication = authentication;
+            _applicationLifetime = applicationLifetime ?? throw new ArgumentNullException(nameof(applicationLifetime));
+            _authentication = authentication ?? throw new ArgumentNullException(nameof(authentication));
+            if (options == null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+            if (loggerFactory == null)
+            {
+                throw new ArgumentNullException(nameof(loggerFactory));
+            }
             _options = options.Value;
 
             if (_options.ForwardWindowsAuthentication)
             {
                 authentication.AddScheme(new AuthenticationScheme(IISDefaults.AuthenticationScheme, _options.AuthenticationDisplayName, typeof(IISServerAuthenticationHandler)));
             }
+
+            _logger = loggerFactory.CreateLogger("Microsoft.AspNetCore.Server.IISIntegration");
         }
 
         public Task StartAsync<TContext>(IHttpApplication<TContext> application, CancellationToken cancellationToken)
         {
-            _httpServerHandle = GCHandle.Alloc(this);
+            if (application == null)
+            {
+                throw new ArgumentNullException(nameof(application));
+            }
+            try
+            {
+                _httpServerHandle = GCHandle.Alloc(this);
+                _iisContextFactory = new IISContextFactory<TContext>(_memoryPool, application, _options, _logger);
 
-            _iisContextFactory = new IISContextFactory<TContext>(_memoryPool, application, _options);
-
-            // Start the server by registering the callback
-            NativeMethods.register_callbacks(_requestHandler, _shutdownHandler, _onAsyncCompletion, (IntPtr)_httpServerHandle, (IntPtr)_httpServerHandle);
+                // Start the server by registering the callback
+                NativeMethods.register_callbacks(_requestHandler, _shutdownHandler, _onAsyncCompletion, (IntPtr)_httpServerHandle, (IntPtr)_httpServerHandle);
+            }
+            catch (Exception ex)
+            {
+                LogHelper.LogException(_logger, "Unable to start in-process server.", ex);
+                Dispose();
+                throw;
+            }
 
             return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            // TODO: Drain pending requests
-
-            // Stop all further calls back into managed code by unhooking the callback
+            // TODO https://github.com/aspnet/IISIntegration/pull/576
 
             return Task.CompletedTask;
         }
@@ -77,14 +101,22 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
         {
             // Unwrap the server so we can create an http context and process the request
             var server = (IISHttpServer)GCHandle.FromIntPtr(pvRequestContext).Target;
+            // TODO check if the server is stoppping and return 503 if we are.
 
             var context = server._iisContextFactory.CreateHttpContext(pInProcessHandler);
 
-            var task = Task.Run(() => context.ProcessRequestAsync());
-
-            task.ContinueWith((t, state) => CompleteRequest((IISHttpContext)state, t), context);
+            ThreadPool.QueueUserWorkItem(ExecuteRequest, context);
 
             return NativeMethods.REQUEST_NOTIFICATION_STATUS.RQ_NOTIFICATION_PENDING;
+        }
+
+        private static void ExecuteRequest(object iisHttpContext)
+        {
+            var context = (IISHttpContext)iisHttpContext;
+
+            var task = context.ProcessRequestAsync();
+
+            task.ContinueWith((t, state) => CompleteRequest((IISHttpContext)state, t), context);
         }
 
         private static bool HandleShutdown(IntPtr pvRequestContext)
@@ -121,17 +153,19 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             private readonly IHttpApplication<T> _application;
             private readonly MemoryPool _memoryPool;
             private readonly IISOptions _options;
+            private readonly ILogger _logger;
 
-            public IISContextFactory(MemoryPool memoryPool, IHttpApplication<T> application, IISOptions options)
+            public IISContextFactory(MemoryPool memoryPool, IHttpApplication<T> application, IISOptions options, ILogger logger)
             {
                 _application = application;
                 _memoryPool = memoryPool;
                 _options = options;
+                _logger = logger;
             }
 
             public IISHttpContext CreateHttpContext(IntPtr pInProcessHandler)
             {
-                return new IISHttpContextOfT<T>(_memoryPool, _application, pInProcessHandler, _options);
+                return new IISHttpContextOfT<T>(_memoryPool, _application, pInProcessHandler, _options, _logger);
             }
         }
     }
