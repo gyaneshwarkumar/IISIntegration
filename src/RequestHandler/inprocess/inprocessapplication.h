@@ -84,9 +84,6 @@ public:
         m_fShutdownCalledFromManaged = TRUE;
     }
 
-    VOID
-    Recycle();
-
     static
         IN_PROCESS_APPLICATION*
         GetInstance(

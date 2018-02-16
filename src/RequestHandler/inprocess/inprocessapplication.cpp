@@ -10,7 +10,7 @@ IN_PROCESS_APPLICATION::IN_PROCESS_APPLICATION(
     m_hLogFileHandle(INVALID_HANDLE_VALUE),
     m_hErrReadPipe(INVALID_HANDLE_VALUE),
     m_hErrWritePipe(INVALID_HANDLE_VALUE),
-    m_dwStdErrReadTotal(0)
+    m_dwStdErrReadTotal(0),
     m_fDoneStdRedirect(FALSE),
     m_fBlockCallbacksIntoManaged(FALSE),
     m_pInitialized(FALSE),
