@@ -229,11 +229,9 @@ APPLICATION_MANAGER::RecycleApplication(
     if (pApplicationInfo != NULL)
     {
         pApplicationInfo->ShutDown();
+        pApplicationInfo->DereferenceApplicationInfo();
+        pApplicationInfo = NULL;
     }
-
-    AcquireSRWLockExclusive(&m_srwLock); // Blocked here.
-    m_pApplicationInfoHash->DereferenceRecord(pApplicationInfo);
-    ReleaseSRWLockExclusive(&m_srwLock);
 
     if(dwPreviousCounter != m_pApplicationInfoHash->Count())
     {
@@ -278,13 +276,14 @@ APPLICATION_MANAGER::ShutDown(
     VOID
 )
 {
+    // This should only be called once, 
     m_fInShutdown = TRUE;
     if (m_pApplicationInfoHash != NULL)
     {
         AcquireSRWLockExclusive(&m_srwLock);
 
         m_pApplicationInfoHash->Apply(APPLICATION_INFO::ShutDownWrapper, NULL);
-
+        m_pApplicationInfoHash->Clear();
         ReleaseSRWLockExclusive(&m_srwLock);
     }
     if (m_pFileWatcher != NULL)
