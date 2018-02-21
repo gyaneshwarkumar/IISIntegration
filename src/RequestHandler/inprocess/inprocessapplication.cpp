@@ -151,6 +151,8 @@ IN_PROCESS_APPLICATION::ShutDown()
 
         CloseHandle(m_hThread);
         m_hThread = NULL;
+
+        Recycle();
     }
 
 

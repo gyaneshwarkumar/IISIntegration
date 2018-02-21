@@ -226,12 +226,25 @@ APPLICATION_MANAGER::RecycleApplication(
     m_pApplicationInfoHash->FindKey(&key, &pApplicationInfo); // FindKey will reference here.
 
     ReleaseSRWLockExclusive(&m_srwLock);
-
-    if (pApplicationInfo != NULL)
+    if (m_hostingModel == HOSTING_OUT_PROCESS)
     {
-        pApplicationInfo->ShutDown();
-        pApplicationInfo->DereferenceApplicationInfo();
-        pApplicationInfo = NULL;
+        m_pApplicationInfoHash->DeleteKey(&key);
+
+    }
+    else if (m_hostingModel == HOSTING_IN_PROCESS)
+    {
+        m_pApplicationInfoHash->FindKey(&key, &pApplicationInfo);
+        pApplicationInfo->ReferenceApplicationInfo();
+        ReleaseSRWLockExclusive(&m_srwLock);
+        // Don't hold onto lock during shutdown such that other requests can notice that we are in shutdown.
+        if (pApplicationInfo != NULL)
+        {
+            pApplicationInfo->ShutDown();
+            pApplicationInfo->DereferenceApplicationInfo();
+            pApplicationInfo = NULL;
+        }
+
+        AcquireSRWLockExclusive(&m_srwLock);
     }
 
     if(dwPreviousCounter != m_pApplicationInfoHash->Count())
@@ -264,6 +277,8 @@ APPLICATION_MANAGER::RecycleApplication(
         g_pHttpServer->RecycleProcess(L"AspNetCore Recycle Process on Demand due to assembly loading failure");
     }
 
+    ReleaseSRWLockExclusive(&m_srwLock);
+
 Finished:
 
     return hr;
@@ -283,6 +298,7 @@ APPLICATION_MANAGER::ShutDown(
     {
         AcquireSRWLockExclusive(&m_srwLock);
 
+        // clean up the hash table so that the application will be informed on shutdown
         m_pApplicationInfoHash->Apply(APPLICATION_INFO::ShutDownWrapper, NULL);
         m_pApplicationInfoHash->Clear();
         ReleaseSRWLockExclusive(&m_srwLock);
