@@ -224,6 +224,7 @@ APPLICATION_MANAGER::RecycleApplication(
     dwPreviousCounter = m_pApplicationInfoHash->Count();
 
     m_pApplicationInfoHash->FindKey(&key, &pApplicationInfo); // FindKey will reference here.
+
     ReleaseSRWLockExclusive(&m_srwLock);
 
     if (pApplicationInfo != NULL)
