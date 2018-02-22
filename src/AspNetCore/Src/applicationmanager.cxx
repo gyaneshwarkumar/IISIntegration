@@ -209,11 +209,11 @@ APPLICATION_MANAGER::RecycleApplication(
     _In_ LPCWSTR pszApplicationId
 )
 {
-    HRESULT          hr = S_OK;
-    APPLICATION_INFO_KEY  key;
-    DWORD            dwPreviousCounter = 0;
-    APPLICATION_INFO* pApplicationInfo;
-
+    HRESULT                 hr = S_OK;
+    APPLICATION_INFO_KEY    key;
+    DWORD                   dwPreviousCounter = 0;
+    APPLICATION_INFO*       pApplicationInfo;
+    BOOL                    fLocked = FALSE;
     hr = key.Initialize(pszApplicationId);
     if (FAILED(hr))
     {
@@ -221,35 +221,43 @@ APPLICATION_MANAGER::RecycleApplication(
     }
 
     AcquireSRWLockExclusive(&m_srwLock);
+    fLocked = TRUE;
+    if (m_hostingModel == HOSTING_UNKNOWN)
+    {
+        goto Finished;
+    }
+
     dwPreviousCounter = m_pApplicationInfoHash->Count();
 
-    m_pApplicationInfoHash->FindKey(&key, &pApplicationInfo); // FindKey will reference here.
+    m_pApplicationInfoHash->FindKey(&key, &pApplicationInfo);
+    if (pApplicationInfo == NULL)
+    {
+        goto Finished;
+    }
 
-    ReleaseSRWLockExclusive(&m_srwLock);
+    pApplicationInfo->ReferenceApplicationInfo();
     if (m_hostingModel == HOSTING_OUT_PROCESS)
     {
+        m_pApplicationInfoHash->DereferenceRecord(pApplicationInfo);
         m_pApplicationInfoHash->DeleteKey(&key);
-
     }
-    else if (m_hostingModel == HOSTING_IN_PROCESS)
-    {
-        m_pApplicationInfoHash->FindKey(&key, &pApplicationInfo);
-        pApplicationInfo->ReferenceApplicationInfo();
-        ReleaseSRWLockExclusive(&m_srwLock);
-        // Don't hold onto lock during shutdown such that other requests can notice that we are in shutdown.
-        if (pApplicationInfo != NULL)
-        {
-            pApplicationInfo->ShutDown();
-            pApplicationInfo->DereferenceApplicationInfo();
-            pApplicationInfo = NULL;
-        }
 
-        AcquireSRWLockExclusive(&m_srwLock);
-    }
+    ReleaseSRWLockExclusive(&m_srwLock);
+    fLocked = FALSE;
+
+    // Don't hold onto lock during shutdown such that other requests can notice that we are in shutdown.
+    // Shutdown will noop if t
+    pApplicationInfo->ShutDown();
+    pApplicationInfo->DereferenceApplicationInfo();
+    pApplicationInfo = NULL;
+
+    AcquireSRWLockExclusive(&m_srwLock);
+    fLocked = TRUE;
 
     if(dwPreviousCounter != m_pApplicationInfoHash->Count())
     {
         // Application got recycled. Log an event
+        // This will only happen for out of process.
         STACK_STRU(strEventMsg, 256);
         if (SUCCEEDED(strEventMsg.SafeSnwprintf(
             ASPNETCORE_EVENT_RECYCLE_CONFIGURATION_MSG,
@@ -269,6 +277,7 @@ APPLICATION_MANAGER::RecycleApplication(
     }
 
 
+Finished:
     if (g_fAspnetcoreRHLoadedError)
     {
         // We had assembly loading failure
@@ -277,10 +286,10 @@ APPLICATION_MANAGER::RecycleApplication(
         g_pHttpServer->RecycleProcess(L"AspNetCore Recycle Process on Demand due to assembly loading failure");
     }
 
-    ReleaseSRWLockExclusive(&m_srwLock);
-
-Finished:
-
+    if (fLocked)
+    {
+        ReleaseSRWLockExclusive(&m_srwLock);
+    }
     return hr;
 }
 
