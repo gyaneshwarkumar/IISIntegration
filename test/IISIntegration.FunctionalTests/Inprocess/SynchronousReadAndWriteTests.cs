@@ -61,12 +61,16 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
         [ConditionalFact(Skip = "See https://github.com/aspnet/IISIntegration/issues/687")]
         public async Task ReadAndWriteEchoTwice()
         {
+            Thread.Sleep(10000);
             var requestBody = new string('a', 10000);
             var content = new StringContent(requestBody);
-            var response = await _fixture.Client.PostAsync("ReadAndWriteEchoTwice", content);
-            var responseText = await response.Content.ReadAsStringAsync();
+            for (var i = 0; i < 1000; i++)
+            {
+                var response = await _fixture.Client.PostAsync("ReadAndWriteEchoTwice", content);
+                var responseText = await response.Content.ReadAsStringAsync();
 
-            Assert.Equal(requestBody.Length * 2, responseText.Length);
+                Assert.Equal(requestBody.Length * 2, responseText.Length);
+            }
         }
 
         [ConditionalFact]

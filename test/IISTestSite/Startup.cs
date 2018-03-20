@@ -386,15 +386,33 @@ namespace IISTestSite
         {
             app.Run(async context =>
             {
+                var totalRead = 0;
+                var totalWritten = 0;
                 var readBuffer = new byte[4096];
-                var result = await context.Request.Body.ReadAsync(readBuffer, 0, readBuffer.Length);
-                while (result != 0)
+                try
                 {
-                    await context.Response.WriteAsync(Encoding.UTF8.GetString(readBuffer, 0, result));
-                    await context.Response.Body.FlushAsync();
-                    await context.Response.WriteAsync(Encoding.UTF8.GetString(readBuffer, 0, result));
-                    await context.Response.Body.FlushAsync();
-                    result = await context.Request.Body.ReadAsync(readBuffer, 0, readBuffer.Length);
+                    var result = await context.Request.Body.ReadAsync(readBuffer, 0, readBuffer.Length);
+                    totalRead += result;
+                    while (result != 0)
+                    {
+                        await context.Response.WriteAsync(Encoding.UTF8.GetString(readBuffer, 0, result));
+                        await context.Response.Body.FlushAsync();
+                        totalWritten += result;
+                        await context.Response.WriteAsync(Encoding.UTF8.GetString(readBuffer, 0, result));
+                        await context.Response.Body.FlushAsync();
+                        totalWritten += result;
+                        result = await context.Request.Body.ReadAsync(readBuffer, 0, readBuffer.Length);
+                    }
+                    totalRead += result;
+                }
+                catch (Exception ex)
+                {
+                    throw ex;
+                }
+
+                if (totalWritten != 20000)
+                {
+                    Console.WriteLine("Ruhrow");
                 }
             });
         }
