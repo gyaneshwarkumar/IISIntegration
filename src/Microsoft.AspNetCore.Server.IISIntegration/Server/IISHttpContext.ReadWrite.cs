@@ -223,15 +223,16 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             }
             else
             {
-                foreach (var memory in buffer)
+                var position = buffer.Start;
+                while (buffer.TryGet(ref position, out var memory))
                 {
-                    nChunks++;
+                    nChunks++; 
                 }
                 for (var i = 0; i < 100; i++)
                 {
                     var localNum = 0;
-
-                    foreach (var mem in buffer)
+                    position = buffer.Start;
+                    while (buffer.TryGet(ref position, out var memory))
                     {
                         localNum++;
                     }

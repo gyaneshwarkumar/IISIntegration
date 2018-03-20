@@ -388,7 +388,7 @@ namespace IISTestSite
             {
                 var totalRead = 0;
                 var totalWritten = 0;
-                var readBuffer = new byte[4096];
+                var readBuffer = new byte[4095];
                 try
                 {
                     var result = await context.Request.Body.ReadAsync(readBuffer, 0, readBuffer.Length);
@@ -408,11 +408,6 @@ namespace IISTestSite
                 catch (Exception ex)
                 {
                     throw ex;
-                }
-
-                if (totalWritten != 20000)
-                {
-                    Console.WriteLine("Ruhrow");
                 }
             });
         }
