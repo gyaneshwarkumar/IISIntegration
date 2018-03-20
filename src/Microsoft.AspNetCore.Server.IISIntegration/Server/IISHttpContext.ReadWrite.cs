@@ -208,12 +208,14 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             return _operation;
         }
 
+        public long bytesWritten = 0;
         private unsafe IISAwaitable WriteToIISAsync(ReadOnlySequence<byte> buffer)
         {
+            // TODO what determines the chunk size of the buffer?
             var fCompletionExpected = false;
             var hr = 0;
             var nChunks = 0;
-
+            bytesWritten += buffer.Length;
             // Count the number of chunks in memory.
             if (buffer.IsSingleSegment)
             {
@@ -224,6 +226,19 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
                 foreach (var memory in buffer)
                 {
                     nChunks++;
+                }
+                for (var i = 0; i < 100; i++)
+                {
+                    var localNum = 0;
+
+                    foreach (var mem in buffer)
+                    {
+                        localNum++;
+                    }
+                    if (nChunks != localNum)
+                    {
+                        Console.WriteLine("well okay");
+                    }
                 }
             }
 
@@ -274,18 +289,25 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             // REVIEW: We don't really need this list since the memory is already pinned with the default pool,
             // but shouldn't assume the pool implementation right now. Unfortunately, this causes a heap allocation...
             var handles = new MemoryHandle[nChunks];
-
             foreach (var b in buffer)
             {
-                ref var handle = ref handles[currentChunk];
-                ref var chunk = ref pDataChunks[currentChunk];
-                handle = b.Retain(true);
+                try
+                {
+                    ref var handle = ref handles[currentChunk];
+                    ref var chunk = ref pDataChunks[currentChunk];
+                    handle = b.Retain(true);
 
-                chunk.DataChunkType = HttpApiTypes.HTTP_DATA_CHUNK_TYPE.HttpDataChunkFromMemory;
-                chunk.fromMemory.BufferLength = (uint)b.Length;
-                chunk.fromMemory.pBuffer = (IntPtr)handle.Pointer;
+                    chunk.DataChunkType = HttpApiTypes.HTTP_DATA_CHUNK_TYPE.HttpDataChunkFromMemory;
+                    chunk.fromMemory.BufferLength = (uint)b.Length;
+                    chunk.fromMemory.pBuffer = (IntPtr)handle.Pointer;
 
-                currentChunk++;
+                    currentChunk++;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("huh?");
+                    throw ex;
+                }
             }
 
             hr = NativeMethods.http_write_response_bytes(_pInProcessHandler, pDataChunks, nChunks, out fCompletionExpected);

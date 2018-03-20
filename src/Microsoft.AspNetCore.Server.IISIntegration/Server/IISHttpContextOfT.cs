@@ -91,6 +91,10 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
                 }
                 await processBodiesTask;
             }
+            if (bytesWritten != 20000)
+            {
+                Console.WriteLine("RIP");
+            }
             return success;
         }
     }

@@ -58,11 +58,11 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
             Assert.Equal(body, responseText);
         }
 
-        [ConditionalFact(Skip = "See https://github.com/aspnet/IISIntegration/issues/687")]
+        [ConditionalFact]
         public async Task ReadAndWriteEchoTwice()
         {
             Thread.Sleep(10000);
-            var requestBody = new string('a', 10000);
+            var requestBody = new string('a', 10240);
             var content = new StringContent(requestBody);
             for (var i = 0; i < 1000; i++)
             {
