@@ -56,9 +56,10 @@ namespace Microsoft.AspNetCore.Hosting
                     throw exception;
                 }
 
-                hostBuilder.UseContentRoot(iisConfigData.pwzFullApplicationPath);
                 return hostBuilder.ConfigureServices(services =>
                 {
+                    // Delay setting the content root so users don't accidentally overwrite it.
+                    hostBuilder.UseContentRoot(iisConfigData.pwzFullApplicationPath);
                     services.AddSingleton<IServer, IISHttpServer>();
                     services.AddSingleton<IStartupFilter>(new IISServerSetupFilter(iisConfigData.pwzVirtualApplicationPath));
                     services.AddAuthenticationCore();
