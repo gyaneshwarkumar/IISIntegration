@@ -37,6 +37,10 @@
     <AncmRHPath>$(NativePlatform)\aspnetcorerh.dll</AncmRHPath>
     <DotNetPath>$(userprofile)\.dotnet\$(NativePlatform)\dotnet.exe</DotNetPath>
   </PropertyGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\test\TestTasks\TestTasks.csproj" />
+  </ItemGroup>
 
   <UsingTask TaskName="InjectRequestHandler" AssemblyFile="$(TargetDir)\TestTasks.dll" />
   
