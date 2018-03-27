@@ -34,7 +34,14 @@
     <IISArguments>-h "$(IISAppHostConfig)"</IISArguments>
 
     <AncmPath>$(NativePlatform)\aspnetcore.dll</AncmPath>
+    <AncmRHPath>$(NativePlatform)\aspnetcorerh.dll</AncmRHPath>
     <DotNetPath>$(userprofile)\.dotnet\$(NativePlatform)\dotnet.exe</DotNetPath>
   </PropertyGroup>
+
+  <UsingTask TaskName="InjectRequestHandler" AssemblyFile="$(TargetDir)\TestTasks.dll" />
+  
+  <Target Name="InjectRequestHandler" AfterTargets="GenerateBuildDependencyFile">
+    <InjectRequestHandler DepsFile="$(ProjectDepsFilePath)" Rid="win7-$(NativePlatform)" LibraryLocation="$(AncmRHPath)" />
+  </Target>
 
 </Project>
