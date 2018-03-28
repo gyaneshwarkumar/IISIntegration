@@ -58,4 +58,5 @@
   <Target Name="InjectRequestHandlerOnPublish" AfterTargets="GeneratePublishDependencyFile">
     <InjectRequestHandler DepsFile="$(PublishDepsFilePath)" Rid="win7-$(NativePlatform)" LibraryLocation="$(AncmRHPath)" />
   </Target>
+
 </Project>
