@@ -43,24 +43,15 @@
   </Target>
 
   <PropertyGroup>
-    <TestTargetsAssembly>$(MSBuildThisFileDirectory)..\test\TestTasks\bin\$(Configuration)\netstandard2.0\TestTasks.dll</TestTargetsAssembly>
+    <TestTargetsAssembly>$(MSBuildThisFileDirectory)..\test\TestTasks\</TestTargetsAssembly>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="$(MSBuildThisFileDirectory)..\test\TestTasks\TestTasks.csproj">
-       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-       <BuildReference Condition="Exists('$(TestTargetsAssembly)')">False</BuildReference>
-    </ProjectReference>
-  </ItemGroup>
-
-  <UsingTask TaskName="InjectRequestHandler" AssemblyFile="$(TestTargetsAssembly)" />
-
   <Target Name="InjectRequestHandler" AfterTargets="GenerateBuildDependencyFile">
-    <InjectRequestHandler DepsFile="$(ProjectDepsFilePath)" Rid="win7-$(NativePlatform)" LibraryLocation="$(AncmRHPath)" />
+    <Exec Command="dotnet run '$(TestTargetsAssembly)' '$(ProjectDepsFilePath)' 'win7-$(NativePlatform)' '$(AncmRHPath)'" />
   </Target>
 
   <Target Name="InjectRequestHandlerOnPublish" AfterTargets="GeneratePublishDependencyFile">
-    <InjectRequestHandler DepsFile="$(PublishDepsFilePath)" Rid="win7-$(NativePlatform)" LibraryLocation="$(AncmRHPath)" />
+    <Exec Command="dotnet run '$(TestTargetsAssembly)' '$(ProjectDepsFilePath)' 'win7-$(NativePlatform)' '$(AncmRHPath)'" />
   </Target>
 
 </Project>
