@@ -1,0 +1,7 @@
+<Project>
+
+  <Import Project="$(MSBuildThisFileDirectory)..\Directory.Build.props" />
+
+  <Import Project="$(MSBuildThisFileDirectory)..\..\build\testsite.props" />
+
+</Project>

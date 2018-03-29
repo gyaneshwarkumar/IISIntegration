@@ -37,16 +37,11 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
 
                 var deploymentParameters = new DeploymentParameters(Helpers.GetInProcessTestSitesPath(), serverType, runtimeFlavor, architecture)
                 {
-                    ServerConfigTemplateContent = (serverType == ServerType.IISExpress) ? File.ReadAllText("AppHostConfig/Http.config") : null,
+                    ServerConfigTemplateContent = File.ReadAllText("AppHostConfig/Http.config"),
                     SiteName = "HttpTestSite", // This is configured in the Http.config
                     TargetFramework = "netcoreapp2.1",
                     ApplicationType = ApplicationType.Portable,
-                    Configuration =
-#if DEBUG
-                        "Debug"
-#else
-                        "Release"
-#endif
+                    Configuration = GetCurrentConfiguration()
                 };
 
                 // Point to dotnet installed in user profile.
@@ -93,16 +88,11 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
 
                 var deploymentParameters = new DeploymentParameters(Helpers.GetInProcessTestSitesPath(), serverType, runtimeFlavor, architecture)
                 {
-                    ServerConfigTemplateContent = (serverType == ServerType.IISExpress) ? File.ReadAllText("AppHostConfig/Http.config") : null,
+                    ServerConfigTemplateContent = File.ReadAllText("AppHostConfig/Http.config"),
                     SiteName = "HttpTestSite", // This is configured in the Http.config
                     TargetFramework = "netcoreapp2.1",
                     ApplicationType = ApplicationType.Portable,
-                    Configuration =
-#if DEBUG
-                        "Debug"
-#else
-                        "Release"
-#endif
+                    Configuration = GetCurrentConfiguration()
                 };
 
                 // Point to dotnet installed in user profile.
@@ -128,7 +118,7 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
 #if NETCOREAPP2_0 || NETCOREAPP2_1
 
         [Fact] // Consistently fails on CI for net461
-        public async Task StandaloneApplication_ExpectCorrectPublish() 
+        public async Task StandaloneApplication_ExpectCorrectPublish()
         {
             var architecture = RuntimeArchitecture.x64;
             var runtimeFlavor = RuntimeFlavor.CoreClr;
@@ -141,7 +131,7 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
 
                 var deploymentParameters = new DeploymentParameters(Helpers.GetInProcessTestSitesPath(), serverType, runtimeFlavor, architecture)
                 {
-                    ServerConfigTemplateContent = (serverType == ServerType.IISExpress) ? File.ReadAllText("AppHostConfig/Http.config") : null,
+                    ServerConfigTemplateContent = File.ReadAllText("AppHostConfig/Http.config"),
                     SiteName = "HttpTestSite", // This is configured in the Http.config
                     TargetFramework = "netcoreapp2.1",
                     ApplicationType = ApplicationType.Standalone,
@@ -192,16 +182,11 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
 
                 var deploymentParameters = new DeploymentParameters(Helpers.GetInProcessTestSitesPath(), serverType, runtimeFlavor, architecture)
                 {
-                    ServerConfigTemplateContent = (serverType == ServerType.IISExpress) ? File.ReadAllText("AppHostConfig/Http.config") : null,
+                    ServerConfigTemplateContent = File.ReadAllText("AppHostConfig/Http.config"),
                     SiteName = "HttpTestSite", // This is configured in the Http.config
                     TargetFramework = "netcoreapp2.1",
                     ApplicationType = ApplicationType.Standalone,
-                    Configuration =
-#if DEBUG
-                        "Debug"
-#else
-                        "Release"
-#endif
+                    Configuration = GetCurrentConfiguration()
                 };
 
                 using (var deployer = ApplicationDeployerFactory.Create(deploymentParameters, loggerFactory))
@@ -235,6 +220,59 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
 #else
 #error Target frameworks need to be updated
 #endif
+        
+        [Fact]
+        public async Task StartignServer()
+        {
+            using (StartLog(out var loggerFactory))
+            {
+                var logger = loggerFactory.CreateLogger("HelloWorldTest");
 
+                using (var deployer = ApplicationDeployerFactory.Create(GetBaseDeploymentParameters("OverriddenServerWebSite"), loggerFactory))
+                {
+                    var deploymentResult = await deployer.DeployAsync();
+
+                    // Request to base address and check if various parts of the body are rendered & measure the cold startup time.
+                    var response = await RetryHelper.RetryRequest(() =>
+                    {
+                        return deploymentResult.HttpClient.GetAsync("HelloWorld");
+                    }, logger, deploymentResult.HostShutdownToken, retryCount: 30);
+
+                    var responseText = await response.Content.ReadAsStringAsync();
+                    try
+                    {
+                        Assert.Equal("Hello World", responseText);
+                    }
+                    catch (XunitException)
+                    {
+                        logger.LogWarning(response.ToString());
+                        logger.LogWarning(responseText);
+                        throw;
+                    }
+                }
+            }
+        }
+
+        private DeploymentParameters GetBaseDeploymentParameters(string site = null)
+        {
+            return new DeploymentParameters(Helpers.GetTestWebSitePath(site ?? "InProcessWebSite"), ServerType.IISExpress, RuntimeFlavor.CoreClr, RuntimeArchitecture.x64)
+            {
+                ServerConfigTemplateContent = File.ReadAllText("AppHostConfig/Http.config"),
+                SiteName = "HttpTestSite", // This is configured in the Http.config
+                TargetFramework = "netcoreapp2.1",
+                ApplicationType = ApplicationType.Portable,
+                Configuration = GetCurrentConfiguration()
+            };
+        }
+
+
+        private static string GetCurrentConfiguration()
+        {
+#if DEBUG
+            return "Debug";
+#else
+            return "Release";
+#endif
+        }
     }
 }

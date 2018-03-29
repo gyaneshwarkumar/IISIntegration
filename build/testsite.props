@@ -9,7 +9,6 @@
     <NativePlatform Condition="'$(NativePlatform)' == ''">$(Platform)</NativePlatform>
   </PropertyGroup>
 
-
   <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
     <None Include="$(MSBuildThisFileDirectory)..\src\RequestHandler\bin\$(Configuration)\$(NativeFolder)\aspnetcorerh.dll" CopyToOutputDirectory="PreserveNewest" Visible="true" Link="$(NativePlatform)\%(FileName)%(Extension)" />
     <None Include="$(MSBuildThisFileDirectory)..\src\RequestHandler\bin\$(Configuration)\$(NativeFolder)\aspnetcorerh.pdb" CopyToOutputDirectory="PreserveNewest" Visible="true" Link="$(NativePlatform)\%(FileName)%(Extension)" />
@@ -37,6 +36,11 @@
     <AncmRHPath>$(NativePlatform)\aspnetcorerh.dll</AncmRHPath>
     <DotNetPath>$(userprofile)\.dotnet\$(NativePlatform)\dotnet.exe</DotNetPath>
   </PropertyGroup>
+
+  <Target Name="CopyLaunchSettings" AfterTargets="CoreBuild">
+    <!-- This would always override launch settings files in test projects by the default one -->
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)launchSettings.json" DestinationFolder="$(MSBuildProjectDirectory)\Properties" />
+  </Target>
 
   <PropertyGroup>
     <TestTargetsAssembly>$(MSBuildThisFileDirectory)..\test\TestTasks\bin\$(Configuration)\netstandard2.0\TestTasks.dll</TestTargetsAssembly>
