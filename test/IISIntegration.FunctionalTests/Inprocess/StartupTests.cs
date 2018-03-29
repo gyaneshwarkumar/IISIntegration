@@ -202,7 +202,6 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
             };
         }
 
-
         private static string GetCurrentConfiguration()
         {
 #if DEBUG

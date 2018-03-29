@@ -112,7 +112,6 @@ namespace Microsoft.AspNetCore.Hosting
             hostBuilder.UseSetting(nameof(UseIISIntegration), "true");
             hostBuilder.CaptureStartupErrors(true);
 
-            // TODO consider adding a configuration load where all variables needed are loaded from ANCM in one call.
             var iisConfigData = new IISConfigurationData();
             var hResult = NativeMethods.http_get_application_properties(ref iisConfigData);
 
