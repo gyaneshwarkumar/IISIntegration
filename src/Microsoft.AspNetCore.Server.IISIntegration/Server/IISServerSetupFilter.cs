@@ -25,7 +25,7 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
                 var server = app.ApplicationServices.GetService<IServer>();
                 if (server?.GetType() != typeof(IISHttpServer))
                 {
-                    throw new InvalidOperationException("Application is running inside IIS process but is not configured to use IIS server. Call UseIISIntegration after adding all other servers.");
+                    throw new InvalidOperationException("Application is running inside IIS process but is not configured to use IIS server.");
                 }
 
                 app.UsePathBase(_virtualPath);
