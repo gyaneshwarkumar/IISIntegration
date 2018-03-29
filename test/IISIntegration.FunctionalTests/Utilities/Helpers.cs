@@ -19,8 +19,8 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
                     "..", // debug
                     "..", // obj
                     "..", // projectfolder
-                    "TestSites",
-                    "InProcessWebSite"));
+                    "WebSites",
+                    name));
         }
 
         public static string GetInProcessTestSitesPath() => GetTestWebSitePath("InProcessWebSite");

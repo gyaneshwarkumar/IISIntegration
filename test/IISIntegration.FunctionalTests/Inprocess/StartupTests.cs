@@ -224,33 +224,20 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
         [Fact]
         public async Task StartignServer()
         {
+            var testSink = new TestSink();
             using (StartLog(out var loggerFactory))
             {
-                var logger = loggerFactory.CreateLogger("HelloWorldTest");
+                var testLoggerFactory = new TestLoggerFactory(testSink, true);
+                loggerFactory.AddProvider(new TestLoggerProvider(testLoggerFactory));
 
                 using (var deployer = ApplicationDeployerFactory.Create(GetBaseDeploymentParameters("OverriddenServerWebSite"), loggerFactory))
                 {
                     var deploymentResult = await deployer.DeployAsync();
-
-                    // Request to base address and check if various parts of the body are rendered & measure the cold startup time.
-                    var response = await RetryHelper.RetryRequest(() =>
-                    {
-                        return deploymentResult.HttpClient.GetAsync("HelloWorld");
-                    }, logger, deploymentResult.HostShutdownToken, retryCount: 30);
-
-                    var responseText = await response.Content.ReadAsStringAsync();
-                    try
-                    {
-                        Assert.Equal("Hello World", responseText);
-                    }
-                    catch (XunitException)
-                    {
-                        logger.LogWarning(response.ToString());
-                        logger.LogWarning(responseText);
-                        throw;
-                    }
+                    var response = await deploymentResult.HttpClient.GetAsync("/");
+                    Assert.False(response.IsSuccessStatusCode);
                 }
             }
+            Assert.Contains(testSink.Writes, context => context.State.ToString().Contains("Application is running inside IIS process but is not configured to use IIS server"));
         }
 
         private DeploymentParameters GetBaseDeploymentParameters(string site = null)
@@ -273,6 +260,25 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
 #else
             return "Release";
 #endif
+        }
+
+        private class TestLoggerProvider : ILoggerProvider
+        {
+            private readonly TestLoggerFactory _loggerFactory;
+
+            public TestLoggerProvider(TestLoggerFactory loggerFactory)
+            {
+                _loggerFactory = loggerFactory;
+            }
+
+            public void Dispose()
+            {
+            }
+
+            public ILogger CreateLogger(string categoryName)
+            {
+                return _loggerFactory.CreateLogger(categoryName);
+            }
         }
     }
 }

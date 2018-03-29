@@ -14,9 +14,9 @@ namespace TestTasks
     {
         private static void Main(string[] args)
         {
-            var depsFile = args[0];
-            var rid = args[1];
-            var libraryLocation = args[2];
+            var depsFile = args[2];
+            var rid = args[0];
+            var libraryLocation = args[1];
 
             JToken deps;
             using (var file = File.OpenText(depsFile))
@@ -27,10 +27,9 @@ namespace TestTasks
 
             var libraryName = "ANCMRH/1.0";
             var libraries = (JObject)deps["libraries"];
-            var targetName = ((JObject)deps["runtimeTarget"]).Properties().FirstOrDefault(p => p.Name == "name");
-            var value = targetName.Value;
+            var targetName = (JValue)deps["runtimeTarget"]["name"];
 
-            var target = (JObject)((JObject)deps["targets"]);
+            var target = (JObject)deps["targets"][targetName.Value];
             var targetLibrary = target.Properties().FirstOrDefault(p => p.Name == libraryName);
             targetLibrary?.Remove();
             targetLibrary =
