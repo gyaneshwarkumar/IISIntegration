@@ -26,23 +26,13 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
         [Fact]
         public async Task ExpandEnvironmentVariableInWebConfig()
         {
-            var runtimeFlavor = RuntimeFlavor.CoreClr;
-            var serverType = ServerType.IISExpress;
-            var testName = $"HelloWorld_{runtimeFlavor}";
             var architecture = RuntimeArchitecture.x64;
             var dotnetLocation = $"%USERPROFILE%\\.dotnet\\{architecture.ToString()}\\dotnet.exe";
-            using (StartLog(out var loggerFactory, testName))
+            using (StartLog(out var loggerFactory))
             {
                 var logger = loggerFactory.CreateLogger("HelloWorldTest");
 
-                var deploymentParameters = new DeploymentParameters(Helpers.GetInProcessTestSitesPath(), serverType, runtimeFlavor, architecture)
-                {
-                    ServerConfigTemplateContent = File.ReadAllText("AppHostConfig/Http.config"),
-                    SiteName = "HttpTestSite", // This is configured in the Http.config
-                    TargetFramework = "netcoreapp2.1",
-                    ApplicationType = ApplicationType.Portable,
-                    Configuration = GetCurrentConfiguration()
-                };
+                var deploymentParameters = GetBaseDeploymentParameters();
 
                 // Point to dotnet installed in user profile.
                 deploymentParameters.EnvironmentVariables["DotnetPath"] = Environment.ExpandEnvironmentVariables(dotnetLocation); // Path to dotnet.
@@ -77,24 +67,12 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
         [Fact]
         public async Task InvalidProcessPath_ExpectServerError()
         {
-            var architecture = RuntimeArchitecture.x64;
-            var runtimeFlavor = RuntimeFlavor.CoreClr;
-            var serverType = ServerType.IISExpress;
-            var testName = $"HelloWorld_{runtimeFlavor}";
             var dotnetLocation = "bogus";
-            using (StartLog(out var loggerFactory, testName))
+            using (StartLog(out var loggerFactory))
             {
                 var logger = loggerFactory.CreateLogger("HelloWorldTest");
-
-                var deploymentParameters = new DeploymentParameters(Helpers.GetInProcessTestSitesPath(), serverType, runtimeFlavor, architecture)
-                {
-                    ServerConfigTemplateContent = File.ReadAllText("AppHostConfig/Http.config"),
-                    SiteName = "HttpTestSite", // This is configured in the Http.config
-                    TargetFramework = "netcoreapp2.1",
-                    ApplicationType = ApplicationType.Portable,
-                    Configuration = GetCurrentConfiguration()
-                };
-
+                var deploymentParameters = GetBaseDeploymentParameters();
+                
                 // Point to dotnet installed in user profile.
                 deploymentParameters.EnvironmentVariables["DotnetPath"] = Environment.ExpandEnvironmentVariables(dotnetLocation); // Path to dotnet.
 
@@ -120,27 +98,11 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
         [Fact] // Consistently fails on CI for net461
         public async Task StandaloneApplication_ExpectCorrectPublish()
         {
-            var architecture = RuntimeArchitecture.x64;
-            var runtimeFlavor = RuntimeFlavor.CoreClr;
-            var serverType = ServerType.IISExpress;
-
             using (StartLog(out var loggerFactory))
             {
                 var logger = loggerFactory.CreateLogger("HelloWorldTest");
-
-                var deploymentParameters = new DeploymentParameters(Helpers.GetInProcessTestSitesPath(), serverType, runtimeFlavor, architecture)
-                {
-                    ServerConfigTemplateContent = File.ReadAllText("AppHostConfig/Http.config"),
-                    SiteName = "HttpTestSite", // This is configured in the Http.config
-                    TargetFramework = "netcoreapp2.1",
-                    ApplicationType = ApplicationType.Standalone,
-                    Configuration =
-#if DEBUG
-                        "Debug"
-#else
-                        "Release"
-#endif
-                };
+                
+                var deploymentParameters = GetBaseDeploymentParameters();
 
                 using (var deployer = ApplicationDeployerFactory.Create(deploymentParameters, loggerFactory))
                 {
@@ -176,7 +138,6 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
 
                 var deploymentParameters = GetBaseDeploymentParameters();
                 deploymentParameters.ApplicationType = ApplicationType.Standalone;
-                deploymentParameters.PreservePublishedApplicationForDebugging = true;
 
                 using (var deployer = ApplicationDeployerFactory.Create(deploymentParameters, loggerFactory))
                 {
@@ -211,7 +172,7 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
 #endif
         
         [Fact]
-        public async Task StartignServer()
+        public async Task DetectsOveriddenServer()
         {
             var testSink = new TestSink();
             using (StartLog(out var loggerFactory))
