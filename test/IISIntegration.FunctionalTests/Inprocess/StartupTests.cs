@@ -123,9 +123,8 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
             var architecture = RuntimeArchitecture.x64;
             var runtimeFlavor = RuntimeFlavor.CoreClr;
             var serverType = ServerType.IISExpress;
-            var testName = $"HelloWorld_{runtimeFlavor}";
 
-            using (StartLog(out var loggerFactory, testName))
+            using (StartLog(out var loggerFactory))
             {
                 var logger = loggerFactory.CreateLogger("HelloWorldTest");
 
@@ -171,29 +170,19 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
         [Fact] // Consistently fails on CI for net461
         public async Task StandaloneApplication_AbsolutePathToExe_ExpectCorrectPublish()
         {
-            var architecture = RuntimeArchitecture.x64;
-            var runtimeFlavor = RuntimeFlavor.CoreClr;
-            var serverType = ServerType.IISExpress;
-            var testName = $"HelloWorld_{runtimeFlavor}";
-
-            using (StartLog(out var loggerFactory, testName))
+            using (StartLog(out var loggerFactory))
             {
                 var logger = loggerFactory.CreateLogger("HelloWorldTest");
 
-                var deploymentParameters = new DeploymentParameters(Helpers.GetInProcessTestSitesPath(), serverType, runtimeFlavor, architecture)
-                {
-                    ServerConfigTemplateContent = File.ReadAllText("AppHostConfig/Http.config"),
-                    SiteName = "HttpTestSite", // This is configured in the Http.config
-                    TargetFramework = "netcoreapp2.1",
-                    ApplicationType = ApplicationType.Standalone,
-                    Configuration = GetCurrentConfiguration()
-                };
+                var deploymentParameters = GetBaseDeploymentParameters();
+                deploymentParameters.ApplicationType = ApplicationType.Standalone;
+                deploymentParameters.PreservePublishedApplicationForDebugging = true;
 
                 using (var deployer = ApplicationDeployerFactory.Create(deploymentParameters, loggerFactory))
                 {
                     var deploymentResult = await deployer.DeployAsync();
 
-                    Helpers.ModifyAspNetCoreSectionInWebConfig(deploymentResult, "processPath", $"{deploymentResult.ContentRoot}\\IISTestSite.exe");
+                    Helpers.ModifyAspNetCoreSectionInWebConfig(deploymentResult, "processPath", $"{deploymentResult.ContentRoot}\\InProcessWebSite.exe");
 
                     // Request to base address and check if various parts of the body are rendered & measure the cold startup time.
                     var response = await RetryHelper.RetryRequest(() =>

@@ -3,7 +3,7 @@
   <Import Project="..\..\..\build\testsite.props" />
 
   <PropertyGroup>
-    <TargetFramework>$(StandardTestTfms)</TargetFramework>
+    <TargetFrameworks>$(StandardTestTfms)</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
