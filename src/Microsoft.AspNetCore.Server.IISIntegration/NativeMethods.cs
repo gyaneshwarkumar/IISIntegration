@@ -66,19 +66,16 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
         private static extern unsafe int http_read_request_bytes(IntPtr pInProcessHandler, byte* pvBuffer, int cbBuffer, out int dwBytesReceived, out bool fCompletionExpected);
 
         [DllImport(AspNetCoreModuleDll)]
-        private static extern bool http_get_completion_info(IntPtr pCompletionInfo, out int cbBytes, out int hr);
+        private static extern void http_get_completion_info(IntPtr pCompletionInfo, out int cbBytes, out int hr);
 
         [DllImport(AspNetCoreModuleDll)]
-        private static extern bool http_set_managed_context(IntPtr pInProcessHandler, IntPtr pvManagedContext);
+        private static extern int http_set_managed_context(IntPtr pInProcessHandler, IntPtr pvManagedContext);
 
         [DllImport(AspNetCoreModuleDll)]
         private static extern int http_get_application_properties(ref IISConfigurationData iiConfigData);
 
         [DllImport(AspNetCoreModuleDll)]
         private static extern int http_get_server_variable(IntPtr pInProcessHandler, [MarshalAs(UnmanagedType.AnsiBStr)] string variableName, [MarshalAs(UnmanagedType.BStr)] out string value);
-
-        [DllImport(AspNetCoreModuleDll)]
-        private static extern bool http_shutdown();
 
         [DllImport(AspNetCoreModuleDll)]
         private static extern unsafe int http_websockets_read_bytes(IntPtr pInProcessHandler, byte* pvBuffer, int cbBuffer, PFN_WEBSOCKET_ASYNC_COMPLETION pfnCompletionCallback, IntPtr pvCompletionContext, out int dwBytesReceived, out bool fCompletionExpected);
@@ -159,14 +156,14 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             return http_read_request_bytes(pInProcessHandler, pvBuffer, cbBuffer, out dwBytesReceived, out fCompletionExpected);
         }
 
-        public static bool HttpGetCompletionInfo(IntPtr pCompletionInfo, out int cbBytes, out int hr)
+        public static void HttpGetCompletionInfo(IntPtr pCompletionInfo, out int cbBytes, out int hr)
         {
-            return http_get_completion_info(pCompletionInfo, out cbBytes, out hr);
+            http_get_completion_info(pCompletionInfo, out cbBytes, out hr);
         }
 
-        public static bool HttpSetManagedContext(IntPtr pInProcessHandler, IntPtr pvManagedContext)
+        public static void HttpSetManagedContext(IntPtr pInProcessHandler, IntPtr pvManagedContext)
         {
-            return http_set_managed_context(pInProcessHandler, pvManagedContext);
+            Validate(http_set_managed_context(pInProcessHandler, pvManagedContext));
         }
 
         public static IISConfigurationData HttpGetApplicationProperties()
@@ -181,17 +178,24 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             return http_get_server_variable(pInProcessHandler, variableName, out value) == 0;
         }
 
-        public static bool HttpShutdown()
-        {
-            return http_shutdown();
-        }
-
-        public static unsafe int HttpWebsocketsReadBytes(IntPtr pInProcessHandler, byte* pvBuffer, int cbBuffer, PFN_WEBSOCKET_ASYNC_COMPLETION pfnCompletionCallback, IntPtr pvCompletionContext, out int dwBytesReceived, out bool fCompletionExpected)
+        public static unsafe int HttpWebsocketsReadBytes(
+            IntPtr pInProcessHandler,
+            byte* pvBuffer,
+            int cbBuffer,
+            PFN_WEBSOCKET_ASYNC_COMPLETION pfnCompletionCallback,
+            IntPtr pvCompletionContext, out int dwBytesReceived,
+            out bool fCompletionExpected)
         {
             return http_websockets_read_bytes(pInProcessHandler, pvBuffer, cbBuffer, pfnCompletionCallback, pvCompletionContext, out dwBytesReceived, out fCompletionExpected);
         }
 
-        public static unsafe int HttpWebsocketsWriteBytes(IntPtr pInProcessHandler, HttpApiTypes.HTTP_DATA_CHUNK* pDataChunks, int nChunks, PFN_WEBSOCKET_ASYNC_COMPLETION pfnCompletionCallback, IntPtr pvCompletionContext, out bool fCompletionExpected)
+        public static unsafe int HttpWebsocketsWriteBytes(
+            IntPtr pInProcessHandler,
+            HttpApiTypes.HTTP_DATA_CHUNK* pDataChunks,
+            int nChunks,
+            PFN_WEBSOCKET_ASYNC_COMPLETION pfnCompletionCallback,
+            IntPtr pvCompletionContext,
+            out bool fCompletionExpected)
         {
             return http_websockets_write_bytes(pInProcessHandler, pDataChunks, nChunks, pfnCompletionCallback, pvCompletionContext, out fCompletionExpected);
         }
@@ -216,9 +220,9 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             Validate(http_response_set_known_header(pInProcessHandler, headerId, pHeaderValue, length, fReplace));
         }
 
-        public static bool HttpTryGetAuthenticationInformation(IntPtr pInProcessHandler, out string authType, out IntPtr token)
+        public static void HttpGetAuthenticationInformation(IntPtr pInProcessHandler, out string authType, out IntPtr token)
         {
-            return http_get_authentication_information(pInProcessHandler, out authType, out token) == 0;
+            Validate(http_get_authentication_information(pInProcessHandler, out authType, out token));
         }
 
         [DllImport("kernel32.dll")]

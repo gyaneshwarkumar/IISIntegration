@@ -113,15 +113,7 @@ namespace Microsoft.AspNetCore.Hosting
             hostBuilder.UseSetting(nameof(UseIISIntegration), "true");
             hostBuilder.CaptureStartupErrors(true);
 
-            var iisConfigData = new IISConfigurationData();
-            var hResult = NativeMethods.http_get_application_properties(ref iisConfigData);
-
-            var exception = Marshal.GetExceptionForHR(hResult);
-            if (exception != null)
-            {
-                throw exception;
-            }
-
+            var iisConfigData = NativeMethods.HttpGetApplicationProperties();
             hostBuilder.UseContentRoot(iisConfigData.pwzFullApplicationPath);
             return hostBuilder.ConfigureServices(
                 services => {

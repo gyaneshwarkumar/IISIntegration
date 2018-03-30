@@ -225,7 +225,7 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
                     chunk.DataChunkType = HttpApiTypes.HTTP_DATA_CHUNK_TYPE.HttpDataChunkFromMemory;
                     chunk.fromMemory.pBuffer = (IntPtr)pBuffer;
                     chunk.fromMemory.BufferLength = (uint)buffer.Length;
-                    NativeMethods.HttpWriteResponseBytes(_pInProcessHandler, pDataChunks, nChunks, out fCompletionExpected);
+                    hr = NativeMethods.HttpWriteResponseBytes(_pInProcessHandler, pDataChunks, nChunks, out fCompletionExpected);
                 }
             }
             else if (nChunks < HttpDataChunkStackLimit)

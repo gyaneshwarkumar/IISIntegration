@@ -533,9 +533,9 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
 
         private WindowsPrincipal GetWindowsPrincipal()
         {
-            var success = NativeMethods.HttpTryGetAuthenticationInformation(_pInProcessHandler, out var authenticationType, out var token);
+            NativeMethods.HttpGetAuthenticationInformation(_pInProcessHandler, out var authenticationType, out var token);
 
-            if (success && token != IntPtr.Zero && authenticationType != null)
+            if (token != IntPtr.Zero && authenticationType != null)
             {
                 if ((authenticationType.Equals(NtlmString, StringComparison.OrdinalIgnoreCase)
                     || authenticationType.Equals(NegotiateString, StringComparison.OrdinalIgnoreCase)
