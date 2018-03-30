@@ -80,7 +80,7 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
                     EnvironmentName = "UpgradeFeatureDetection", // Will pick the Start class named 'StartupHelloWorld',
                     ServerConfigTemplateContent = (serverType == ServerType.IISExpress) ? File.ReadAllText(configPath) : null,
                     SiteName = "HttpTestSite", // This is configured in the Http.config
-                    TargetFramework = "netcoreapp2.0",
+                    TargetFramework = "netcoreapp2.1",
                     ApplicationType = applicationType,
                     Configuration =
 #if DEBUG
@@ -93,13 +93,12 @@ namespace Microsoft.AspNetCore.Server.IISIntegration.FunctionalTests
                 using (var deployer = ApplicationDeployerFactory.Create(deploymentParameters, loggerFactory))
                 {
                     var deploymentResult = await deployer.DeployAsync();
-                    deploymentResult.HttpClient.Timeout = TimeSpan.FromSeconds(5);
 
                     // Request to base address and check if various parts of the body are rendered & measure the cold startup time.
                     var response = await RetryHelper.RetryRequest(() =>
                     {
                         return deploymentResult.HttpClient.GetAsync("UpgradeFeatureDetection");
-                    }, logger, deploymentResult.HostShutdownToken, retryCount: 30);
+                    }, logger, deploymentResult.HostShutdownToken, retryCount: 1);
 
                     var responseText = await response.Content.ReadAsStringAsync();
                     try

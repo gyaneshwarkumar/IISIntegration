@@ -23,7 +23,7 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
         internal static extern bool CloseHandle(IntPtr handle);
 
         public const int S_OK = 0;
-        private const string AspNetCoreModuleDll = "aspnetcorerh.dll";
+        private const string AspNetCoreModuleDll = "AspNetCoreIISInProcessRequestHandler.dll";
 
         public enum REQUEST_NOTIFICATION_STATUS
         {

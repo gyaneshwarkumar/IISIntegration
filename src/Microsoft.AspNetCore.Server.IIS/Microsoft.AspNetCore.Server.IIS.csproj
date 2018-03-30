@@ -17,8 +17,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <SignedPackageFile Include="aspnetcorerh_x86" PackagePath="runtimes/win-x86/nativeassets/$(TargetFramework)/aspnetcorerh.dll" Certificate="Microsoft" />
-    <SignedPackageFile Include="aspnetcorerh_x64" PackagePath="runtimes/win-x64/nativeassets/$(TargetFramework)/aspnetcorerh.dll" Certificate="Microsoft" />
+    <SignedPackageFile Include="aspnetcorerh_x86" PackagePath="runtimes/win-x86/nativeassets/$(TargetFramework)/AspNetCoreIISInProcessRequestHandler.dll" Certificate="Microsoft" />
+    <SignedPackageFile Include="aspnetcorerh_x64" PackagePath="runtimes/win-x64/nativeassets/$(TargetFramework)/AspNetCoreIISInProcessRequestHandler.dll" Certificate="Microsoft" />
   </ItemGroup>
 
   <ItemGroup>

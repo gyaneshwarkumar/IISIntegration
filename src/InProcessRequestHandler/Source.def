@@ -1,0 +1,6 @@
+LIBRARY AspNetCoreIISInProcessRequestHandler
+
+EXPORTS
+    CreateApplication
+    CreateRequestHandler
+
