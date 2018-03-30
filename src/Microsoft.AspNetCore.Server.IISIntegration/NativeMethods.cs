@@ -9,13 +9,25 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
 {
     internal static class NativeMethods
     {
+        private const int HR_NOT_FOUND = unchecked((int)0x80070490);
+        private const int HR_OK = 0;
+
         private const string KERNEL32 = "kernel32.dll";
+
+        private const string AspNetCoreModuleDll = "aspnetcorerh.dll";
 
         [DllImport(KERNEL32, ExactSpelling = true, SetLastError = true)]
 
         public static extern bool CloseHandle(IntPtr handle);
 
-        private const string AspNetCoreModuleDll = "aspnetcorerh.dll";
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        public static bool IsAspNetCoreModuleLoaded()
+        {
+            return GetModuleHandle(AspNetCoreModuleDll) != IntPtr.Zero;
+        }
 
         public enum REQUEST_NOTIFICATION_STATUS
         {
@@ -221,10 +233,17 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             Validate(http_enable_websockets(pInProcessHandler));
         }
 
-        public static void HttpCancelIO(IntPtr pInProcessHandler)
+        public static bool HttpTryCancelIO(IntPtr pInProcessHandler)
         {
-            //TODO: Validation is disabled here because it randomly returns 0x80070490 Element not found
-            http_cancel_io(pInProcessHandler);
+            var hr = http_cancel_io(pInProcessHandler);
+            // Async operation finished
+            // https://msdn.microsoft.com/en-us/library/windows/desktop/aa363792(v=vs.85).aspx
+            if (hr == HR_NOT_FOUND)
+            {
+                return false;
+            }
+            Validate(hr);
+            return true;
         }
 
         public static unsafe void HttpResponseSetUnknownHeader(IntPtr pInProcessHandler, byte* pszHeaderName, byte* pszHeaderValue, ushort usHeaderValueLength, bool fReplace)
@@ -242,17 +261,9 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             Validate(http_get_authentication_information(pInProcessHandler, out authType, out token));
         }
 
-        [DllImport("kernel32.dll")]
-        private static extern IntPtr GetModuleHandle(string lpModuleName);
-
-        public static bool IsAspNetCoreModuleLoaded()
-        {
-            return GetModuleHandle(AspNetCoreModuleDll) != IntPtr.Zero;
-        }
-
         private static void Validate(int hr)
         {
-            if (hr != 0)
+            if (hr != HR_OK)
             {
                 throw Marshal.GetExceptionForHR(hr);
             }

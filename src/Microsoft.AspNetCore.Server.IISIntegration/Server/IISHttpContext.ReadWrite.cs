@@ -468,7 +468,7 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
             {
                 _reading = false;
                 // Calls IHttpContext->CancelIo(), which will cause the OnAsyncCompletion handler to fire.
-                NativeMethods.HttpCancelIO(_pInProcessHandler);
+                NativeMethods.HttpTryCancelIO(_pInProcessHandler);
             }
         }
     }
