@@ -75,13 +75,29 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
         private static extern int http_get_application_properties(ref IISConfigurationData iiConfigData);
 
         [DllImport(AspNetCoreModuleDll)]
-        private static extern int http_get_server_variable(IntPtr pInProcessHandler, [MarshalAs(UnmanagedType.AnsiBStr)] string variableName, [MarshalAs(UnmanagedType.BStr)] out string value);
+        private static extern int http_get_server_variable(
+            IntPtr pInProcessHandler,
+            [MarshalAs(UnmanagedType.AnsiBStr)] string variableName,
+            [MarshalAs(UnmanagedType.BStr)] out string value);
 
         [DllImport(AspNetCoreModuleDll)]
-        private static extern unsafe int http_websockets_read_bytes(IntPtr pInProcessHandler, byte* pvBuffer, int cbBuffer, PFN_WEBSOCKET_ASYNC_COMPLETION pfnCompletionCallback, IntPtr pvCompletionContext, out int dwBytesReceived, out bool fCompletionExpected);
+        private static extern unsafe int http_websockets_read_bytes(
+            IntPtr pInProcessHandler,
+            byte* pvBuffer,
+            int cbBuffer,
+            PFN_WEBSOCKET_ASYNC_COMPLETION pfnCompletionCallback,
+            IntPtr pvCompletionContext,
+            out int dwBytesReceived,
+            out bool fCompletionExpected);
 
         [DllImport(AspNetCoreModuleDll)]
-        private static extern unsafe int http_websockets_write_bytes(IntPtr pInProcessHandler, HttpApiTypes.HTTP_DATA_CHUNK* pDataChunks, int nChunks, PFN_WEBSOCKET_ASYNC_COMPLETION pfnCompletionCallback, IntPtr pvCompletionContext, out bool fCompletionExpected);
+        private static extern unsafe int http_websockets_write_bytes(
+            IntPtr pInProcessHandler,
+            HttpApiTypes.HTTP_DATA_CHUNK* pDataChunks,
+            int nChunks,
+            PFN_WEBSOCKET_ASYNC_COMPLETION pfnCompletionCallback,
+            IntPtr pvCompletionContext,
+            out bool fCompletionExpected);
 
         [DllImport(AspNetCoreModuleDll)]
         private static extern int http_enable_websockets(IntPtr pInProcessHandler);
@@ -207,7 +223,8 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
 
         public static void HttpCancelIO(IntPtr pInProcessHandler)
         {
-            Validate(http_cancel_io(pInProcessHandler));
+            //TODO: Validation is disabled here because it randomly returns 0x80070490 Element not found
+            http_cancel_io(pInProcessHandler);
         }
 
         public static unsafe void HttpResponseSetUnknownHeader(IntPtr pInProcessHandler, byte* pszHeaderName, byte* pszHeaderValue, ushort usHeaderValueLength, bool fReplace)
