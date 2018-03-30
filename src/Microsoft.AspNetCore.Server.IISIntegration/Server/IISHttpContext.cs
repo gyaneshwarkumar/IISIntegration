@@ -145,13 +145,12 @@ namespace Microsoft.AspNetCore.Server.IISIntegration
                 // server variables a few extra times if a bunch of requests hit the server at the same time.
                 if (_websocketAvailability == WebsocketAvailabilityStatus.Uninitialized)
                 {
-                    if (NativeMethods.HttpTryGetServerVariable(pInProcessHandler, WebSocketVersionString, out var webSocketsSupported))
-                    {
-                        var webSocketsAvailable = !string.IsNullOrEmpty(webSocketsSupported);
-                        _websocketAvailability = webSocketsAvailable ?
-                            WebsocketAvailabilityStatus.Available :
-                            WebsocketAvailabilityStatus.NotAvailable;
-                    }
+                    var webSocketsAvailable =  NativeMethods.HttpTryGetServerVariable(pInProcessHandler, WebSocketVersionString, out var webSocketsSupported)
+                                               && !string.IsNullOrEmpty(webSocketsSupported);
+
+                    _websocketAvailability = webSocketsAvailable ?
+                        WebsocketAvailabilityStatus.Available :
+                        WebsocketAvailabilityStatus.NotAvailable;
                 }
 
                 if (_websocketAvailability == WebsocketAvailabilityStatus.NotAvailable)
