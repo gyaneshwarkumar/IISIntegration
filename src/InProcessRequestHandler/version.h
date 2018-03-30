@@ -10,4 +10,4 @@
 #define ProductVersion 8,1,18089,0
 #define ProductVersionStr "8.1.18089.0\0"
 #define PlatformToolset "v141\0"
-#define CommitHash "df6471f4625f978ef6405da716cdce822f0d5587\0"
+#define CommitHash "\0"

@@ -61,8 +61,6 @@
 #include "disconnectcontext.h"
 #include "environmentvariablehelpers.h"
 #include "sttimer.h"
-#include ".\inprocess\InProcessHandler.h"
-#include ".\inprocess\inprocessapplication.h"
 #include ".\outofprocess\responseheaderhash.h"
 #include ".\outofprocess\protocolconfig.h"
 #include ".\outofprocess\forwarderconnection.h"
