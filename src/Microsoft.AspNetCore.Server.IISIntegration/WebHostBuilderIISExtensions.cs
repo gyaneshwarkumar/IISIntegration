@@ -43,6 +43,7 @@ namespace Microsoft.AspNetCore.Hosting
             // Check if in process
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && NativeMethods.IsAspNetCoreModuleLoaded())
             {
+
                 return SetupInProcessServer(hostBuilder);
             }
 
