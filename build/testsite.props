@@ -24,7 +24,7 @@
   <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
     <None Include="$(MSBuildThisFileDirectory)..\src\InProcessRequestHandler\bin\$(Configuration)\$(NativeFolder)\AspNetCoreIISInProcessRequestHandler.dll" CopyToOutputDirectory="PreserveNewest" Visible="true" Link="$(NativePlatform)\%(FileName)%(Extension)" />
     <None Include="$(MSBuildThisFileDirectory)..\src\InProcessRequestHandler\bin\$(Configuration)\$(NativeFolder)\AspNetCoreIISInProcessRequestHandler.pdb" CopyToOutputDirectory="PreserveNewest" Visible="true" Link="$(NativePlatform)\%(FileName)%(Extension)" />
-    <None Include="$(MSBuildThisFileDirectory)..\src\AspNetCore\bin\$(Configuration)\$(NativeFolder)\aspnetcore.dll" CopyToOutputDirectory="PreserveNewest" Visible="true" Link="$(NativePlatform)\%(FileName)%(Extension)" />
+    <None Include="$(MSBuildThisFileDirectory)..\src\AspNetCore\bin\$(Configuration)\$(NativeFolder)\aspnetcoreshim.dll" CopyToOutputDirectory="PreserveNewest" Visible="true" Link="$(NativePlatform)\%(FileName)%(Extension)" />
     <None Include="$(MSBuildThisFileDirectory)..\src\AspNetCore\bin\$(Configuration)\$(NativeFolder)\aspnetcore.pdb" CopyToOutputDirectory="PreserveNewest" Visible="true" Link="$(NativePlatform)\%(FileName)%(Extension)" />
   </ItemGroup>
 
@@ -32,7 +32,7 @@
     <IISExpressArguments>/config:"$(IISExpressAppHostConfig)"</IISExpressArguments>
     <IISArguments>-h "$(IISAppHostConfig)"</IISArguments>
 
-    <AncmPath>$(NativePlatform)\aspnetcore.dll</AncmPath>
+    <AncmPath>$(NativePlatform)\aspnetcoreshim.dll</AncmPath>
     <AncmRHPath>$(NativePlatform)\AspNetCoreIISInProcessRequestHandler.dll</AncmRHPath>
     <DotNetPath>$(userprofile)\.dotnet\$(NativePlatform)\dotnet.exe</DotNetPath>
   </PropertyGroup>

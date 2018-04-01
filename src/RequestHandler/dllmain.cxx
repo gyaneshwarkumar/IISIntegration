@@ -160,7 +160,7 @@ EnsureOutOfProcessInitializtion()
 
         g_hWinHttpModule = GetModuleHandle(TEXT("winhttp.dll"));
 
-        g_hAspNetCoreModule = GetModuleHandle(TEXT("aspnetcore.dll"));
+        g_hAspNetCoreModule = GetModuleHandle(TEXT("aspnetcoreshim.dll"));
 
         hr = WINHTTP_HELPER::StaticInitialize();
         if (FAILED(hr))

@@ -46,8 +46,8 @@
     </ArtifactInfo>
 
     <FilesToSign Include="$(AncmZipOutputPath)" IsContainer="true" />
-    <FilesToSign Include="x64/aspnetcore.dll" Container="$(AncmZipOutputPath)" Certificate="$(AssemblySigningCertName)" />
-    <FilesToSign Include="x86/aspnetcore.dll" Container="$(AncmZipOutputPath)" Certificate="$(AssemblySigningCertName)" />
+    <FilesToSign Include="x64/aspnetcoreshim.dll" Container="$(AncmZipOutputPath)" Certificate="$(AssemblySigningCertName)" />
+    <FilesToSign Include="x86/aspnetcoreshim.dll" Container="$(AncmZipOutputPath)" Certificate="$(AssemblySigningCertName)" />
     <FilesToSign Include="x64/aspnetcorerh.dll" Container="$(AncmZipOutputPath)" Certificate="$(AssemblySigningCertName)" />
     <FilesToSign Include="x86/aspnetcorerh.dll" Container="$(AncmZipOutputPath)" Certificate="$(AssemblySigningCertName)" />
   </ItemGroup>
@@ -61,12 +61,12 @@
 
     <ItemGroup>
       <!-- x64 -->
-      <AncmFiles Include="$(RepositoryRoot)src\AspNetCore\bin\$(Configuration)\x64\aspnetcore.dll" Link="x64\aspnetcore.dll" />
+      <AncmFiles Include="$(RepositoryRoot)src\AspNetCore\bin\$(Configuration)\x64\aspnetcoreshim.dll" Link="x64\aspnetcoreshim.dll" />
       <AncmFiles Include="$(RepositoryRoot)src\AspNetCore\bin\$(Configuration)\x64\aspnetcore.pdb" Link="x64\aspnetcore.pdb" />
       <AncmFiles Include="$(RepositoryRoot)src\RequestHandler\bin\$(Configuration)\x64\aspnetcorerh.dll" Link="x64\aspnetcorerh.dll" />
       <AncmFiles Include="$(RepositoryRoot)src\RequestHandler\bin\$(Configuration)\x64\aspnetcorerh.pdb" Link="x64\aspnetcorerh.pdb" />
       <!-- x86 -->
-      <AncmFiles Include="$(RepositoryRoot)src\AspNetCore\bin\$(Configuration)\Win32\aspnetcore.dll" Link="x86\aspnetcore.dll" />
+      <AncmFiles Include="$(RepositoryRoot)src\AspNetCore\bin\$(Configuration)\Win32\aspnetcoreshim.dll" Link="x86\aspnetcoreshim.dll" />
       <AncmFiles Include="$(RepositoryRoot)src\AspNetCore\bin\$(Configuration)\Win32\aspnetcore.pdb" Link="x86\aspnetcore.pdb" />
       <AncmFiles Include="$(RepositoryRoot)src\RequestHandler\bin\$(Configuration)\Win32\aspnetcorerh.dll" Link="x86\aspnetcorerh.dll" />
       <AncmFiles Include="$(RepositoryRoot)src\RequestHandler\bin\$(Configuration)\Win32\aspnetcorerh.pdb" Link="x86\aspnetcorerh.pdb" />

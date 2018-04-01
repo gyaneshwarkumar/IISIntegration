@@ -30,7 +30,7 @@ DebugPrint(
     if ( IfDebug( dwFlag ) )
     {
         hr = strOutput.SafeSnprintf( 
-            "[aspnetcore.dll] %s\r\n",
+            "[aspnetcoreshim.dll] %s\r\n",
             szString );
 
         if (FAILED (hr))

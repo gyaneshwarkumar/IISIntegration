@@ -81,7 +81,7 @@ BEGIN
             VALUE "FileVersion", FileVersionStr
             VALUE "InternalName", "aspnetcore"
             VALUE "LegalCopyright", "Copyright (C) Microsoft Corporation"
-            VALUE "OriginalFilename", "aspnetcore.dll"
+            VALUE "OriginalFilename", "aspnetcoreshim.dll"
             VALUE "ProductName", "ASP.NET Core Module"
             VALUE "ProductVersion", ProductVersionStr
         END
