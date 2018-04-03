@@ -17,8 +17,8 @@ namespace AspNetCoreModuleTests
             DWORD retVal = 0;
             BSTR* bstrArray;
             PCWSTR exeStr = L"C:/Program Files/dotnet.exe";
-
-            HRESULT hr = HOSTFXR_UTILITY::ParseHostfxrArguments(
+            HOSTFXR_UTILITY* hostfxrUtility = new HOSTFXR_UTILITY(new WindowsFileApiMock());
+            HRESULT hr = hostfxrUtility->ParseHostfxrArguments(
                 L"exec \"test.dll\"", // args
                 exeStr,  // exe path
                 L"invalid",  // physical path to application
@@ -38,8 +38,8 @@ namespace AspNetCoreModuleTests
             DWORD retVal = 0;
             BSTR* bstrArray;
             PCWSTR exeStr = L"C:/Program Files/dotnet.exe";
-
-            HRESULT hr = HOSTFXR_UTILITY::ParseHostfxrArguments(
+            HOSTFXR_UTILITY* hostfxrUtility = new HOSTFXR_UTILITY(new WindowsFileApiMock());
+            HRESULT hr = hostfxrUtility->ParseHostfxrArguments(
                 L"test.dll", // args
                 exeStr,  // exe path
                 L"ignored",  // physical path to application
@@ -58,8 +58,8 @@ namespace AspNetCoreModuleTests
             DWORD retVal = 0;
             BSTR* bstrArray;
             PCWSTR exeStr = L"C:/Program Files/dotnet.exe";
-
-            HRESULT hr = HOSTFXR_UTILITY::ParseHostfxrArguments(
+            HOSTFXR_UTILITY* hostfxrUtility = new HOSTFXR_UTILITY(new WindowsFileApiMock());
+            HRESULT hr = hostfxrUtility->ParseHostfxrArguments(
                 L"exec \"test.dll\"", // args
                 exeStr,  // exe path
                 L"C:/test",  // physical path to application
@@ -79,8 +79,8 @@ namespace AspNetCoreModuleTests
             DWORD retVal = 0;
             BSTR* bstrArray;
             PCWSTR exeStr = L"C:/Program Files/dotnet.exe";
-
-            HRESULT hr = HOSTFXR_UTILITY::ParseHostfxrArguments(
+            HOSTFXR_UTILITY* hostfxrUtility = new HOSTFXR_UTILITY(new WindowsFileApiMock());
+            HRESULT hr = hostfxrUtility->ParseHostfxrArguments(
                 L"", // args
                 exeStr,  // exe path
                 L"ignored",  // physical path to application

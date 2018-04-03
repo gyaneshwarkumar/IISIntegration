@@ -54,6 +54,15 @@ class ASPNETCORE_CONFIG : IHttpStoredContext
 {
 public:
 
+    ASPNETCORE_CONFIG() :
+        m_fStdoutLogEnabled(FALSE),
+        m_pEnvironmentVariables(NULL),
+        m_cRefs(1),
+        m_hostingModel(HOSTING_UNKNOWN),
+        m_ppStrArguments(NULL)
+    {
+    }
+
     virtual
     ~ASPNETCORE_CONFIG();
 
@@ -70,6 +79,7 @@ public:
         _In_  HTTP_MODULE_ID           pModuleId,
         _In_  IHttpContext            *pHttpContext,
         _In_  HANDLE                   hEventLog,
+        _In_  HOSTFXR_UTILITY         *pHostfxr,
         _Out_ ASPNETCORE_CONFIG       **ppAspNetCoreConfig
     );
 
@@ -285,17 +295,6 @@ public:
 
 private:
 
-    //
-    // private constructor
-    //    
-    ASPNETCORE_CONFIG():
-        m_fStdoutLogEnabled( FALSE ),
-        m_pEnvironmentVariables( NULL ),
-        m_cRefs( 1 ),
-        m_hostingModel( HOSTING_UNKNOWN ),
-        m_ppStrArguments(NULL)
-    {
-    }
 
     HRESULT
     Populate(
@@ -327,6 +326,6 @@ private:
     APP_HOSTING_MODEL      m_hostingModel;
     ENVIRONMENT_VAR_HASH*  m_pEnvironmentVariables;
     STRU                   m_struHostFxrLocation;
-    PWSTR*                m_ppStrArguments;
+    PWSTR*                 m_ppStrArguments;
     DWORD                  m_dwArgc;
 };

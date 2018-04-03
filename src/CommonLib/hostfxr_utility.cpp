@@ -3,8 +3,9 @@
 
 #include "stdafx.h"
 
-HOSTFXR_UTILITY::HOSTFXR_UTILITY()
+HOSTFXR_UTILITY::HOSTFXR_UTILITY(WindowsFileApiInterface* pFileApi)
 {
+    m_pFileApi = pFileApi;
 }
 
 HOSTFXR_UTILITY::~HOSTFXR_UTILITY()
@@ -561,7 +562,7 @@ HOSTFXR_UTILITY::FindDotnetExePath(
     {
         // Where succeeded. 
         // Reset file pointer to the beginning of the file. 
-        dwFilePointer = SetFilePointer(hStdOutReadPipe, 0, NULL, FILE_BEGIN);
+        dwFilePointer = m_pFileApi->WindowsSetFilePointer(hStdOutReadPipe, 0, NULL, FILE_BEGIN);
         if (dwFilePointer == INVALID_SET_FILE_POINTER)
         {
             goto Fallback;
@@ -571,7 +572,7 @@ HOSTFXR_UTILITY::FindDotnetExePath(
         // As the call to where.exe succeeded (dotnet.exe was found), ReadFile should not hang.
         // TODO consider putting ReadFile in a separate thread with a timeout to guarantee it doesn't block.
         //
-        if (!ReadFile(hStdOutReadPipe, pzFileContents, READ_BUFFER_SIZE, &dwNumBytesRead, NULL))
+        if (!m_pFileApi->WindowsReadFile(hStdOutReadPipe, pzFileContents, READ_BUFFER_SIZE, &dwNumBytesRead, NULL))
         {
             goto Fallback;
         }

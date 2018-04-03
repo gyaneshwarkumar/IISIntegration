@@ -54,3 +54,4 @@
 #include "..\..\src\CommonLib\aspnetcore_msg.h"
 
 #include "CppUnitTest.h"
+#include "WindowsFileApiMock.h"

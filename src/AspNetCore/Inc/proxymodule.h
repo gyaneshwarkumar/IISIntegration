@@ -11,7 +11,7 @@ class ASPNET_CORE_PROXY_MODULE : public CHttpModule
 {
  public:
 
-     ASPNET_CORE_PROXY_MODULE();
+     ASPNET_CORE_PROXY_MODULE(WindowsFileApiInterface* pFileApi, HOSTFXR_UTILITY* pHostfxrUtility);
 
     ~ASPNET_CORE_PROXY_MODULE();
 
@@ -48,11 +48,20 @@ class ASPNET_CORE_PROXY_MODULE : public CHttpModule
     APPLICATION_INFO *m_pApplicationInfo;
     APPLICATION      *m_pApplication;
     REQUEST_HANDLER  *m_pHandler;
+    WindowsFileApiInterface *m_pFileApi;
+    HOSTFXR_UTILITY         *m_pHostfxrUtility;
 };
 
 class ASPNET_CORE_PROXY_MODULE_FACTORY : public IHttpModuleFactory
 {
  public:
+
+     ASPNET_CORE_PROXY_MODULE_FACTORY(WindowsFileApiInterface* pFileApi, HOSTFXR_UTILITY* pHostfxrUtility)
+     {
+         m_pFileApi = pFileApi;
+         m_pHostfxrUtility = pHostfxrUtility;
+     }
+
     HRESULT
     GetHttpModule(
         CHttpModule **      ppModule,
@@ -61,4 +70,8 @@ class ASPNET_CORE_PROXY_MODULE_FACTORY : public IHttpModuleFactory
 
     VOID
     Terminate();
+
+private:
+    HOSTFXR_UTILITY* m_pHostfxrUtility;
+    WindowsFileApiInterface * m_pFileApi;
 };

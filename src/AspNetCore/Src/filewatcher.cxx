@@ -460,7 +460,7 @@ FILE_WATCHER_ENTRY::Create(
         }
     }
 
-    _hDirectory = CreateFileW(
+    _hDirectory = CreateFile(
         _strDirectoryName.QueryStr(),
         FILE_LIST_DIRECTORY,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,

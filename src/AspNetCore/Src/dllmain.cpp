@@ -180,7 +180,20 @@ HRESULT
     // The ASPNET_CORE_PROXY_MODULE_FACTORY::Terminate method will clean any
     // static object initialized.
     //
-    pFactory = new ASPNET_CORE_PROXY_MODULE_FACTORY;
+    WindowsFileApiInterface* pFileApi = new WindowsFileApi;
+    if (pFileApi == NULL)
+    {
+        hr = E_OUTOFMEMORY;
+        goto Finished;
+    }
+    HOSTFXR_UTILITY* pHostfxrUtility = new HOSTFXR_UTILITY(pFileApi);
+    if (pHostfxrUtility == NULL)
+    {
+        hr = E_OUTOFMEMORY;
+        goto Finished;
+    }
+
+    pFactory = new ASPNET_CORE_PROXY_MODULE_FACTORY(pFileApi, pHostfxrUtility);
 
     if (pFactory == NULL)
     {

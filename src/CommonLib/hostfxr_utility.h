@@ -8,13 +8,13 @@ typedef INT(*hostfxr_main_fn) (CONST DWORD argc, CONST PCWSTR argv[]);
 
 #define READ_BUFFER_SIZE 4096
 
+class WindowsFileApiInterface;
 class HOSTFXR_UTILITY
 {
 public:
-    HOSTFXR_UTILITY();
+    HOSTFXR_UTILITY(WindowsFileApiInterface* pFileApi);
     ~HOSTFXR_UTILITY();
 
-	static
 	HRESULT
 	GetHostFxrParameters(
         HANDLE              hEventLog,
@@ -26,7 +26,6 @@ public:
         _Out_ BSTR**       ppwzArgv
 	);
 
-    static
     HRESULT
     GetStandaloneHostfxrParameters(
         PCWSTR              pwzExeAbsolutePath, // includes .exe file extension.
@@ -38,7 +37,6 @@ public:
         _Out_ BSTR**		ppwzArgv
     );
 
-    static
     HRESULT
     ParseHostfxrArguments(
         PCWSTR              pwzArgumentsFromConfig,
@@ -49,10 +47,11 @@ public:
         _Out_ BSTR**       ppwzArgv
     );
 
-    static
     HRESULT
     FindDotnetExePath(
         STRU*   struDotnetLocation
     );
+private:
+    WindowsFileApiInterface* m_pFileApi;
 };
 

@@ -10,7 +10,7 @@ ASPNET_CORE_PROXY_MODULE_FACTORY::GetHttpModule(
     IModuleAllocator *  pAllocator
 )
 {
-    ASPNET_CORE_PROXY_MODULE *pModule = new (pAllocator) ASPNET_CORE_PROXY_MODULE();
+    ASPNET_CORE_PROXY_MODULE *pModule = new (pAllocator) ASPNET_CORE_PROXY_MODULE(m_pFileApi, m_pHostfxrUtility);
     if (pModule == NULL)
     {
         return E_OUTOFMEMORY;
@@ -51,8 +51,12 @@ Return value:
 }
 
 ASPNET_CORE_PROXY_MODULE::ASPNET_CORE_PROXY_MODULE(
+   WindowsFileApiInterface* pFileApi,
+   HOSTFXR_UTILITY*         pHostfxrUtiity
 ) : m_pApplicationInfo(NULL), m_pHandler(NULL)
-{
+{  
+    m_pFileApi = pFileApi;
+    m_pHostfxrUtility = pHostfxrUtiity;
 }
 
 ASPNET_CORE_PROXY_MODULE::~ASPNET_CORE_PROXY_MODULE()
@@ -88,8 +92,9 @@ ASPNET_CORE_PROXY_MODULE::OnExecuteRequestHandler(
         hr = HRESULT_FROM_WIN32(ERROR_SERVER_SHUTDOWN_IN_PROGRESS);
         goto Finished;
     }
-
-    hr = ASPNETCORE_CONFIG::GetConfig(g_pHttpServer, g_pModuleId, pHttpContext, g_hEventLog, &pConfig);
+    
+     
+    hr = ASPNETCORE_CONFIG::GetConfig(g_pHttpServer, g_pModuleId, pHttpContext, g_hEventLog, m_pHostfxrUtility, &pConfig);
     if (FAILED(hr))
     {
         goto Finished;

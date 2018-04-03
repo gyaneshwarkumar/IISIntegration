@@ -173,7 +173,6 @@
     <ClInclude Include="application.h" />
     <ClInclude Include="aspnetcoreconfig.h" />
     <ClInclude Include="debugutil.h" />
-    <ClInclude Include="disconnectcontext.h" />
     <ClInclude Include="environmentvariablehash.h" />
     <ClInclude Include="fx_ver.h" />
     <ClInclude Include="hostfxr_utility.h" />
@@ -181,6 +180,8 @@
     <ClInclude Include="resources.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="utility.h" />
+    <ClInclude Include="WindowsFileApi.h" />
+    <ClInclude Include="WindowsFileApiInterface.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="application.cpp" />
@@ -195,6 +196,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="utility.cxx" />
+    <ClCompile Include="WindowsFileApi.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\IISLib\IISLib.vcxproj">

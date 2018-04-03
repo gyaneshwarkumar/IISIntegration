@@ -5,6 +5,7 @@
 #include "aspnetcoreconfig.h"
 #include "debugutil.h"
 
+
 ASPNETCORE_CONFIG::~ASPNETCORE_CONFIG()
 {
     if (m_ppStrArguments != NULL)
@@ -48,6 +49,7 @@ ASPNETCORE_CONFIG::GetConfig(
     _In_  HTTP_MODULE_ID           pModuleId,
     _In_  IHttpContext            *pHttpContext,
     _In_  HANDLE                   hEventLog,
+    _In_  HOSTFXR_UTILITY         *pHostfxrUtility,
     _Out_ ASPNETCORE_CONFIG      **ppAspNetCoreConfig
 )
 {
@@ -77,7 +79,7 @@ ASPNETCORE_CONFIG::GetConfig(
         goto Finished;
     }
 
-    pAspNetCoreConfig = new ASPNETCORE_CONFIG;
+    pAspNetCoreConfig = new ASPNETCORE_CONFIG();
     if (pAspNetCoreConfig == NULL)
     {
         hr = E_OUTOFMEMORY;
@@ -93,7 +95,8 @@ ASPNETCORE_CONFIG::GetConfig(
     // Modify config for inprocess.
     if (pAspNetCoreConfig->QueryHostingModel() == APP_HOSTING_MODEL::HOSTING_IN_PROCESS)
     {
-        if (FAILED(hr = HOSTFXR_UTILITY::GetHostFxrParameters(
+         
+        if (FAILED(hr = pHostfxrUtility->GetHostFxrParameters( // public entry point?
             hEventLog,
             pAspNetCoreConfig->QueryProcessPath()->QueryStr(),
             pAspNetCoreConfig->QueryApplicationPhysicalPath()->QueryStr(),
