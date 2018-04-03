@@ -20,7 +20,19 @@ IN_PROCESS_HANDLER::OnExecuteRequestHandler()
 {
     // First get the in process Application
     HRESULT hr;
-    hr = ((IN_PROCESS_APPLICATION*)m_pApplication)->LoadManagedApplication();
+    try
+    {
+        hr = ((IN_PROCESS_APPLICATION*)m_pApplication)->LoadManagedApplication();
+    }
+    catch (const std::system_error& ex)
+    {
+        hr = ex.code().value();
+    }
+    catch (...)
+    {
+        hr = ERROR_EXCEPTION_IN_SERVICE;
+    }
+
     if (FAILED(hr))
     {
         // TODO remove com_error?

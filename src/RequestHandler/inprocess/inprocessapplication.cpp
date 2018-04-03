@@ -21,7 +21,6 @@ IN_PROCESS_APPLICATION::IN_PROCESS_APPLICATION(
     // If so, I don't think there is much to do here.
     DBG_ASSERT(pHttpServer != NULL);
     DBG_ASSERT(pConfig != NULL);
-    InitializeSRWLock(&m_srwLock);
 
     // TODO we can probably initialized as I believe we are the only ones calling recycle.
     m_status = APPLICATION_STATUS::STARTING;
@@ -57,49 +56,54 @@ IN_PROCESS_APPLICATION::ShutDown(
     VOID
 )
 {
-    HANDLE   hThread = NULL;
-    HRESULT  hr = S_OK;
-    DWORD    dwThreadStatus = 0;
-    DWORD    dwTimeout = m_pConfig->QueryShutdownTimeLimitInMS();
+    HRESULT hr = S_OK;
+    try
+    {    
+        CHandle  hThread;
+        DWORD    dwThreadStatus = 0;
+        DWORD    dwTimeout = m_pConfig->QueryShutdownTimeLimitInMS();
 
-    if (IsDebuggerPresent())
-    {
-        dwTimeout = INFINITE;
-    }
-
-    hThread = CreateThread(
-        NULL,       // default security attributes
-        0,          // default stack size
-        (LPTHREAD_START_ROUTINE)DoShutDown,
-        this,       // thread function arguments
-        0,          // default creation flags
-        NULL);      // receive thread identifier
-
-    if (hThread == NULL)
-    {
-        hr = HRESULT_FROM_WIN32(GetLastError());
-        goto Finished;
-    }
-
-    if (WaitForSingleObject(hThread, dwTimeout) != WAIT_OBJECT_0)
-    {
-        // if the thread is still running, we need kill it first before exit to avoid AV
-        if (GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 && dwThreadStatus == STILL_ACTIVE)
+        if (IsDebuggerPresent())
         {
-            // Calling back into managed at this point is prone to have AVs
-            // Calling terminate thread here may be our best solution.
-            TerminateThread(hThread, STATUS_CONTROL_C_EXIT);
-            hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+            dwTimeout = INFINITE;
         }
+
+        hThread.Attach(CreateThread(
+            NULL,       // default security attributes
+            0,          // default stack size
+            (LPTHREAD_START_ROUTINE)DoShutDown,
+            this,       // thread function arguments
+            0,          // default creation flags
+            NULL));      // receive thread identifier
+
+        if ((HANDLE)hThread == NULL)
+        {
+            hr = HRESULT_FROM_WIN32(GetLastError());
+            goto Finished;
+        }
+
+        if (WaitForSingleObject(hThread, dwTimeout) != WAIT_OBJECT_0)
+        {
+            // if the thread is still running, we need kill it first before exit to avoid AV
+            if (GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 && dwThreadStatus == STILL_ACTIVE)
+            {
+                // Calling back into managed at this point is prone to have AVs
+                // Calling terminate thread here may be our best solution.
+                TerminateThread(hThread, STATUS_CONTROL_C_EXIT);
+                hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+            }
+        }
+    }
+    catch (const std::system_error& ex)
+    {
+        hr = ex.code().value();
+    }
+    catch (...)
+    {
+        hr = ERROR_EXCEPTION_IN_SERVICE;
     }
 
 Finished:
-
-    if (hThread != NULL)
-    {
-        CloseHandle(hThread);
-    }
-    m_hThread = NULL;
 
     if (FAILED(hr))
     {
@@ -132,70 +136,77 @@ IN_PROCESS_APPLICATION::ShutDownInternal()
     DWORD    dwTimeout = m_pConfig->QueryShutdownTimeLimitInMS();
     HANDLE   handle = NULL;
     WIN32_FIND_DATA fileData;
-    BOOL     fLocked = FALSE;
 
-    if (IsDebuggerPresent())
+    try
     {
-        dwTimeout = INFINITE;
-    }
-
-    if (m_fShutdownCalledFromNative ||
-        m_status == APPLICATION_STATUS::STARTING ||
-        m_status == APPLICATION_STATUS::FAIL)
-    {
-        goto Finished;
-    }
-
-    AcquireSRWLockExclusive(&m_srwLock);
-    fLocked = TRUE;
-
-    if (m_fShutdownCalledFromNative ||
-        m_status == APPLICATION_STATUS::STARTING ||
-        m_status == APPLICATION_STATUS::FAIL)
-    {
-        goto Finished;
-    }
-
-    // We need to keep track of when both managed and native initiate shutdown
-    // to avoid AVs. If shutdown has already been initiated in managed, we don't want to call into
-    // managed. We still need to wait on main exiting no matter what. m_fShutdownCalledFromNative
-    // is used for detecting redundant calls and blocking more requests to OnExecuteRequestHandler.
-    m_fShutdownCalledFromNative = TRUE;
-    m_status = APPLICATION_STATUS::SHUTDOWN;
-
-    if (!m_fShutdownCalledFromManaged)
-    {
-        // We cannot call into managed if the dll is detaching from the process.
-        // Calling into managed code when the dll is detaching is strictly a bad idea,
-        // and usually results in an AV saying "The string binding is invalid"
-        if (!g_fProcessDetach)
+        if (IsDebuggerPresent())
         {
-            m_ShutdownHandler(m_ShutdownHandlerContext);
-            m_ShutdownHandler = NULL;
+            dwTimeout = INFINITE;
         }
 
-        ReleaseSRWLockExclusive(&m_srwLock);
-        fLocked = FALSE;
-
-        // Release the lock before we wait on the thread to exit. 
-        if (m_hThread != NULL &&
-            GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 &&
-            dwThreadStatus == STILL_ACTIVE)
+        if (m_fShutdownCalledFromNative ||
+            m_status == APPLICATION_STATUS::STARTING ||
+            m_status == APPLICATION_STATUS::FAIL)
         {
-            // wait for graceful shutdown, i.e., the exit of the background thread or timeout
-            if (WaitForSingleObject(m_hThread, dwTimeout) != WAIT_OBJECT_0)
+            return;
+        }
+
+        {
+            std::unique_lock<std::mutex> lock(m_srwLock);
+
+            if (m_fShutdownCalledFromNative ||
+                m_status == APPLICATION_STATUS::STARTING ||
+                m_status == APPLICATION_STATUS::FAIL)
             {
-                // if the thread is still running, we need kill it first before exit to avoid AV
-                if (GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 && dwThreadStatus == STILL_ACTIVE)
+                return;
+            }
+
+            // We need to keep track of when both managed and native initiate shutdown
+            // to avoid AVs. If shutdown has already been initiated in managed, we don't want to call into
+            // managed. We still need to wait on main exiting no matter what. m_fShutdownCalledFromNative
+            // is used for detecting redundant calls and blocking more requests to OnExecuteRequestHandler.
+            m_fShutdownCalledFromNative = TRUE;
+            m_status = APPLICATION_STATUS::SHUTDOWN;
+
+            if (!m_fShutdownCalledFromManaged)
+            {
+                // We cannot call into managed if the dll is detaching from the process.
+                // Calling into managed code when the dll is detaching is strictly a bad idea,
+                // and usually results in an AV saying "The string binding is invalid"
+                if (!g_fProcessDetach)
                 {
-                    // Calling back into managed at this point is prone to have AVs
-                    // Calling terminate thread here may be our best solution.
-                    TerminateThread(m_hThread, STATUS_CONTROL_C_EXIT);
+                    m_ShutdownHandler(m_ShutdownHandlerContext);
+                    m_ShutdownHandler = NULL;
+                }
+            }
+            
+            // Release the lock before we wait on the thread to exit. 
+        }
+
+        if (!m_fShutdownCalledFromManaged)
+        {
+            if (m_hThread != NULL &&
+                GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 &&
+                dwThreadStatus == STILL_ACTIVE)
+            {
+                // wait for graceful shutdown, i.e., the exit of the background thread or timeout
+                if (WaitForSingleObject(m_hThread, dwTimeout) != WAIT_OBJECT_0)
+                {
+                    // if the thread is still running, we need kill it first before exit to avoid AV
+                    if (GetExitCodeThread(m_hThread, &dwThreadStatus) != 0 && dwThreadStatus == STILL_ACTIVE)
+                    {
+                        // Calling back into managed at this point is prone to have AVs
+                        // Calling terminate thread here may be our best solution.
+                        TerminateThread(m_hThread, STATUS_CONTROL_C_EXIT);
+                    }
                 }
             }
         }
     }
-
+    catch(...)
+    {
+    }
+    
     CloseHandle(m_hThread);
     m_hThread = NULL;
     s_Application = NULL;
@@ -227,58 +238,49 @@ IN_PROCESS_APPLICATION::ShutDownInternal()
         // as nothing can be done
         DeleteFile(m_struLogFilePath.QueryStr());
     }
-
-Finished:
-
-    if (fLocked)
-    {
-        ReleaseSRWLockExclusive(&m_srwLock);
-    }
-    return;
 }
 
+__override
 VOID
 IN_PROCESS_APPLICATION::Recycle(
     VOID
 )
 {
-    BOOL  fLockAcquired = FALSE;
-    // We need to guarantee that recycle is only called once, as calling pHttpServer->RecycleProcess
-    // multiple times can lead to AVs. 
-    if (m_fRecycleCalled)
+    try
     {
-        goto Finished;
-    }
+         // We need to guarantee that recycle is only called once, as calling pHttpServer->RecycleProcess
+        // multiple times can lead to AVs. 
+        if (m_fRecycleCalled)
+        {
+            return;
+        }
 
-    AcquireSRWLockExclusive(&m_srwLock);
-    fLockAcquired = TRUE;
+        {
+            std::unique_lock<std::mutex> lock(m_srwLock);
 
-    if (m_fRecycleCalled)
-    {
-        goto Finished;
-    }
-    if (!m_pHttpServer->IsCommandLineLaunch())
-    {
-        // IIS scenario.
-        // notify IIS first so that new request will be routed to new worker process
-        m_pHttpServer->RecycleProcess(L"AspNetCore InProcess Recycle Process on Demand");
-    }
-    else
-    {
+            if (m_fRecycleCalled)
+            {
+                return;
+            }
+            if (!m_pHttpServer->IsCommandLineLaunch())
+            {
+                // IIS scenario.
+                // notify IIS first so that new request will be routed to new worker process
+                m_pHttpServer->RecycleProcess(L"AspNetCore InProcess Recycle Process on Demand");
+                return;
+            }
+
+            // Release the lock first as Shutdown will acquire lock later   
+        }
+        
         // IISExpress scenario
-        // Release the lock first as Shutdown will acquire lock later
-        ReleaseSRWLockExclusive(&m_srwLock);
-        fLockAcquired = FALSE;
-
         // Shutdown the managed application and call exit to terminate current process
         ShutDown();
         exit(0);
     }
-
-Finished:
-    if (fLockAcquired)
+    catch (...)
     {
-        ReleaseSRWLockExclusive(&m_srwLock);
+        // Ignore exceptions
     }
 }
 
@@ -398,7 +400,6 @@ IN_PROCESS_APPLICATION::SetStdOut(
 )
 {
     HRESULT                 hr = S_OK;
-    BOOL                    fLocked = FALSE;
     STRU                    struPath;
     SYSTEMTIME              systemTime;
     SECURITY_ATTRIBUTES     saAttr = { 0 };
@@ -408,8 +409,7 @@ IN_PROCESS_APPLICATION::SetStdOut(
     if (!m_fDoneStdRedirect)
     {
         // Have not set stdout yet, redirect stdout to log file
-        AcquireSRWLockExclusive(&m_srwLock);
-        fLocked = TRUE;
+        std::unique_lock<std::mutex> lock(m_srwLock);
         if (!m_fDoneStdRedirect)
         {
             saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
@@ -559,10 +559,6 @@ IN_PROCESS_APPLICATION::SetStdOut(
 
 Finished:
     m_fDoneStdRedirect = TRUE;
-    if (fLocked)
-    {
-        ReleaseSRWLockExclusive(&m_srwLock);
-    }
     if (FAILED(hr) && m_pConfig->QueryStdoutLogEnabled())
     {
         STRU                    strEventMsg;
@@ -662,7 +658,6 @@ IN_PROCESS_APPLICATION::LoadManagedApplication
     HRESULT    hr = S_OK;
     DWORD      dwTimeout;
     DWORD      dwResult;
-    BOOL       fLocked = FALSE;
 
     ReferenceApplication();
 
@@ -685,84 +680,84 @@ IN_PROCESS_APPLICATION::LoadManagedApplication
     // Set up stdout redirect
     SetStdOut();
 
-    AcquireSRWLockExclusive(&m_srwLock);
-    fLocked = TRUE;
-    if (m_status != APPLICATION_STATUS::STARTING)
     {
-        if (m_status == APPLICATION_STATUS::FAIL)
+        std::unique_lock<std::mutex> lock(m_srwLock);
+        if (m_status != APPLICATION_STATUS::STARTING)
+        {
+            if (m_status == APPLICATION_STATUS::FAIL)
+            {
+                hr = E_APPLICATION_ACTIVATION_EXEC_FAILURE;
+            }
+            else if (m_status == APPLICATION_STATUS::SHUTDOWN)
+            {
+                hr = HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IS_SCHEDULED);
+            }
+
+            goto Finished;
+        }
+        m_hThread = CreateThread(
+            NULL,       // default security attributes
+            0,          // default stack size
+            (LPTHREAD_START_ROUTINE)ExecuteAspNetCoreProcess,
+            this,       // thread function arguments
+            0,          // default creation flags
+            NULL);      // receive thread identifier
+
+        if (m_hThread == NULL)
+        {
+            hr = HRESULT_FROM_WIN32(GetLastError());
+            goto Finished;
+        }
+
+        m_pInitalizeEvent = CreateEvent(
+            NULL,   // default security attributes
+            TRUE,   // manual reset event
+            FALSE,  // not set
+            NULL);  // name
+
+        if (m_pInitalizeEvent == NULL)
+        {
+            hr = HRESULT_FROM_WIN32(GetLastError());
+        }
+
+        // If the debugger is attached, never timeout
+        if (IsDebuggerPresent())
+        {
+            dwTimeout = INFINITE;
+        }
+        else
+        {
+            dwTimeout = m_pConfig->QueryStartupTimeLimitInMS();
+        }
+
+        const HANDLE pHandles[2]{ m_hThread, m_pInitalizeEvent };
+
+        // Wait on either the thread to complete or the event to be set
+        dwResult = WaitForMultipleObjects(2, pHandles, FALSE, dwTimeout);
+    
+        // It all timed out
+        if (dwResult == WAIT_TIMEOUT)
+        {
+            // kill the backend thread as loading dotnet timedout
+            TerminateThread(m_hThread, 0);
+            hr = HRESULT_FROM_WIN32(dwResult);
+            goto Finished;
+        }
+        else if (dwResult == WAIT_FAILED)
+        {
+            hr = HRESULT_FROM_WIN32(GetLastError());
+            goto Finished;
+        }
+
+        // The thread ended it means that something failed
+        if (dwResult == WAIT_OBJECT_0)
         {
             hr = E_APPLICATION_ACTIVATION_EXEC_FAILURE;
-        }
-        else if (m_status == APPLICATION_STATUS::SHUTDOWN)
-        {
-            hr = HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IS_SCHEDULED);
+            goto Finished;
         }
 
-        goto Finished;
+        m_status = APPLICATION_STATUS::RUNNING;
     }
-    m_hThread = CreateThread(
-        NULL,       // default security attributes
-        0,          // default stack size
-        (LPTHREAD_START_ROUTINE)ExecuteAspNetCoreProcess,
-        this,       // thread function arguments
-        0,          // default creation flags
-        NULL);      // receive thread identifier
-
-    if (m_hThread == NULL)
-    {
-        hr = HRESULT_FROM_WIN32(GetLastError());
-        goto Finished;
-    }
-
-    m_pInitalizeEvent = CreateEvent(
-        NULL,   // default security attributes
-        TRUE,   // manual reset event
-        FALSE,  // not set
-        NULL);  // name
-
-    if (m_pInitalizeEvent == NULL)
-    {
-        hr = HRESULT_FROM_WIN32(GetLastError());
-    }
-
-    // If the debugger is attached, never timeout
-    if (IsDebuggerPresent())
-    {
-        dwTimeout = INFINITE;
-    }
-    else
-    {
-        dwTimeout = m_pConfig->QueryStartupTimeLimitInMS();
-    }
-
-    const HANDLE pHandles[2]{ m_hThread, m_pInitalizeEvent };
-
-    // Wait on either the thread to complete or the event to be set
-    dwResult = WaitForMultipleObjects(2, pHandles, FALSE, dwTimeout);
-    
-    // It all timed out
-    if (dwResult == WAIT_TIMEOUT)
-    {
-        // kill the backend thread as loading dotnet timedout
-        TerminateThread(m_hThread, 0);
-        hr = HRESULT_FROM_WIN32(dwResult);
-        goto Finished;
-    }
-    else if (dwResult == WAIT_FAILED)
-    {
-        hr = HRESULT_FROM_WIN32(GetLastError());
-        goto Finished;
-    }
-
-    // The thread ended it means that something failed
-    if (dwResult == WAIT_OBJECT_0)
-    {
-        hr = E_APPLICATION_ACTIVATION_EXEC_FAILURE;
-        goto Finished;
-    }
-
-    m_status = APPLICATION_STATUS::RUNNING;
-
 Finished:
 
     if (FAILED(hr))
@@ -782,12 +777,6 @@ Finished:
                 strEventMsg.QueryStr());
         }
     }
-
-    if (fLocked)
-    {
-        ReleaseSRWLockExclusive(&m_srwLock);
-    }
-
     DereferenceApplication();
 
     return hr;
