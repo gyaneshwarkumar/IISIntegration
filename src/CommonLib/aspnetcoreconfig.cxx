@@ -5,7 +5,6 @@
 #include "aspnetcoreconfig.h"
 #include "debugutil.h"
 
-
 ASPNETCORE_CONFIG::~ASPNETCORE_CONFIG()
 {
     if (m_ppStrArguments != NULL)

@@ -54,14 +54,6 @@ class ASPNETCORE_CONFIG : IHttpStoredContext
 {
 public:
 
-    ASPNETCORE_CONFIG() :
-        m_fStdoutLogEnabled(FALSE),
-        m_pEnvironmentVariables(NULL),
-        m_cRefs(1),
-        m_hostingModel(HOSTING_UNKNOWN),
-        m_ppStrArguments(NULL)
-    {
-    }
 
     virtual
     ~ASPNETCORE_CONFIG();
@@ -295,6 +287,14 @@ public:
 
 private:
 
+    ASPNETCORE_CONFIG() :
+        m_fStdoutLogEnabled(FALSE),
+        m_pEnvironmentVariables(NULL),
+        m_cRefs(1),
+        m_hostingModel(HOSTING_UNKNOWN),
+        m_ppStrArguments(NULL)
+    {
+    }
 
     HRESULT
     Populate(

@@ -675,9 +675,7 @@ Fallback:
         }
     }
 
-
 Finished:
-
     if (hStdOutReadPipe != INVALID_HANDLE_VALUE)
     {
         CloseHandle(hStdOutReadPipe);
