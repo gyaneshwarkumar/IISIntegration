@@ -51,8 +51,8 @@
 #include "..\..\src\CommonLib\debugutil.h"
 #include "..\..\src\CommonLib\requesthandler.h"
 #include "..\..\src\CommonLib\resources.h"
+#include "WindowsFileApiMock.h"
+#include "..\..\src\CommonLib\WindowsFileApiInterface.h"
 #include "..\..\src\CommonLib\aspnetcore_msg.h"
 
 #include "CppUnitTest.h"
-#include "WindowsFileApiInterface.h"
-#include "WindowsFileApiMock.h"
