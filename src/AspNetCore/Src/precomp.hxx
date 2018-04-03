@@ -111,6 +111,7 @@ inline bool IsSpace(char ch)
 #include "..\..\CommonLib\resources.h"
 #include "..\..\CommonLib\aspnetcore_msg.h"
 //#include "aspnetcore_event.h"
+#include "AspNetCoreProxyModuleFactory.h"
 #include "appoffline.h"
 #include "filewatcher.h"
 #include "applicationinfo.h"
