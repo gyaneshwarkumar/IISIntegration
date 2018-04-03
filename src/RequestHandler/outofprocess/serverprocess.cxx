@@ -528,15 +528,20 @@ SERVER_PROCESS::PostStartCheck(
             // make sure the process is still running
             if (processStatus != STILL_ACTIVE)
             {
-                hr = E_APPLICATION_ACTIVATION_EXEC_FAILURE;
-                strEventMsg.SafeSnwprintf(
-                    ASPNETCORE_EVENT_PROCESS_START_STATUS_ERROR_MSG,
-                    m_struAppFullPath.QueryStr(),
-                    m_struPhysicalPath.QueryStr(),
-                    m_struCommandLine.QueryStr(),
-                    hr,
-                    processStatus);
-                goto Finished;
+                // double check
+                if (GetExitCodeProcess(m_hProcessHandle, &processStatus) && processStatus != STILL_ACTIVE)
+                {
+                    hr = E_APPLICATION_ACTIVATION_EXEC_FAILURE;
+                    strEventMsg.SafeSnwprintf(
+                        ASPNETCORE_EVENT_PROCESS_START_STATUS_ERROR_MSG,
+                        m_struAppFullPath.QueryStr(),
+                        m_struPhysicalPath.QueryStr(),
+                        m_struCommandLine.QueryStr(),
+                        hr,
+                        m_dwProcessId,
+                        processStatus);
+                    goto Finished;
+                }
             }
         }
         //
@@ -557,6 +562,7 @@ SERVER_PROCESS::PostStartCheck(
     if (!fReady)
     {
         hr = E_APPLICATION_ACTIVATION_TIMED_OUT;
+        goto Finished;
     }
 
     // register call back with the created process
@@ -574,6 +580,7 @@ SERVER_PROCESS::PostStartCheck(
         // some error occurred  - assume debugger is not attached;
         fDebuggerAttached = FALSE;
     }
+
     if (!g_fNsiApiNotSupported)
     {
         //
@@ -725,11 +732,14 @@ Finished:
             m_pForwarderConnection = NULL;
         }
 
-        UTILITY::LogEvent(
-            g_hEventLog,
-            EVENTLOG_WARNING_TYPE,
-            ASPNETCORE_EVENT_PROCESS_START_ERROR,
-            strEventMsg.QueryStr());
+        if (!strEventMsg.IsEmpty())
+        {
+            UTILITY::LogEvent(
+                g_hEventLog,
+                EVENTLOG_WARNING_TYPE,
+                ASPNETCORE_EVENT_PROCESS_START_ERROR,
+                strEventMsg.QueryStr());
+        }
     }
     return hr;
 }
@@ -894,6 +904,7 @@ SERVER_PROCESS::StartProcess(
                 ASPNETCORE_EVENT_PROCESS_START_SUCCESS_MSG,
                 m_struAppFullPath.QueryStr(),
                 m_dwProcessId,
+                m_dwListeningProcessId,
                 m_dwPort)))
         {
             UTILITY::LogEvent(g_hEventLog,
@@ -1159,6 +1170,9 @@ SERVER_PROCESS::CheckIfServerIsUp(
             goto Finished;
         }
 
+        // More entries may be created between the two GetExtendedTcpTable calls
+        // Give a bigger buffer, 200 byte is big enough to hold additional entries
+        dwSize += 200;
         pTCPInfo = (MIB_TCPTABLE_OWNER_PID*)HeapAlloc(GetProcessHeap(), 0, dwSize);
         if (pTCPInfo == NULL)
         {
@@ -1222,6 +1236,12 @@ SERVER_PROCESS::CheckIfServerIsUp(
         if (iResult == SOCKET_ERROR)
         {
             hr = HRESULT_FROM_WIN32(WSAGetLastError());
+            if (hr == HRESULT_FROM_WIN32(WSAECONNREFUSED))
+            {
+                // WSAECONNREFUSED means no application listen on the given port.
+                // This is not a failure. Reset the hresult tp S_OK and return fReady to false
+                hr = S_OK;
+            }
             goto Finished;
         }
         *pfReady = TRUE;
@@ -1889,12 +1909,25 @@ SERVER_PROCESS::HandleProcessExit( VOID )
     HRESULT     hr = S_OK;
     BOOL        fReady = FALSE;
     DWORD       dwProcessId = 0;
+    STRU        strEventMsg;
     if (InterlockedCompareExchange(&m_lStopping, 1L, 0L) == 0L)
     {
         CheckIfServerIsUp(m_dwPort, &dwProcessId, &fReady);
 
         if (!fReady)
         {
+            if (SUCCEEDED(strEventMsg.SafeSnwprintf(
+                ASPNETCORE_EVENT_PROCESS_SHUTDOWN_MSG,
+                m_struAppFullPath.QueryStr(),
+                m_struPhysicalPath.QueryStr(),
+                m_dwProcessId,
+                m_dwPort)))
+            {
+                UTILITY::LogEvent(g_hEventLog,
+                    EVENTLOG_INFORMATION_TYPE,
+                    ASPNETCORE_EVENT_PROCESS_SHUTDOWN,
+                    strEventMsg.QueryStr());
+            }
             m_pProcessManager->ShutdownProcess(this);
         }
 
