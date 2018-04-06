@@ -16,7 +16,6 @@ TEST(PassUnexpandedEnvString, ExpandsResult)
     EXPECT_STREQ(L"foobar", struExpandedString.QueryStr());
 }
 
-
 TEST(PassUnexpandedEnvString, LongStringExpandsResults)
 {
     HRESULT hr = S_OK;

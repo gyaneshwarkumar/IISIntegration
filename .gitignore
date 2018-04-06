@@ -55,10 +55,8 @@ src/AspNetCore/version.h
 src/RequestHandler/version.h
 src/CommonLib/aspnetcore_msg.h
 src/CommonLib/aspnetcore_msg.rc
-test/AspNetCoreModuleTests/Debug
-test/AspNetCoreModuleTests/Release
-test/CommonLibTests/Debug
-test/CommonLibTests/Release
+test/*/Debug
+test/*/Release
 test/gtest-1.8.0/msvc/Debug
 test/gtest-1.8.0/msvc/Release
 .build
@@ -66,5 +64,3 @@ test/gtest-1.8.0/msvc/Release
 *.VC.*db
 global.json
 msbuild.binlog
-
-
